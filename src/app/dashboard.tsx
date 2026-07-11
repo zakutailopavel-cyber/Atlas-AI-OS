@@ -43,7 +43,8 @@ export default function Dashboard({ user }: { user: User }) {
     [team, setTeam] = useState<{ email: string; role: string }[]>([]),
     [loading, setLoading] = useState(true),
     [modelOpen, setModelOpen] = useState<Model | null | undefined>(),
-    [contentOpen, setContentOpen] = useState(false);
+    [contentOpen, setContentOpen] = useState(false),
+    [weekOpen, setWeekOpen] = useState(false);
   const [selectedItem, setSelectedItem] = useState<Item | null>(null);
   async function load() {
     setLoading(true);
@@ -83,6 +84,11 @@ export default function Dashboard({ user }: { user: User }) {
   async function saveItem(x: Partial<Item>) {
     await s.from("content_items").insert({ ...x, created_by: user.id });
     setContentOpen(false);
+    load();
+  }
+  async function saveWeek(posts: Partial<Item>[]) {
+    await s.from("content_items").insert(posts.map((x) => ({ ...x, created_by: user.id })));
+    setWeekOpen(false);
     load();
   }
   async function status(item: Item, next: string) {
@@ -162,6 +168,7 @@ export default function Dashboard({ user }: { user: User }) {
               add={() => setContentOpen(true)}
               status={status}
               open={setSelectedItem}
+              plan={() => setWeekOpen(true)}
             />
           )}{" "}
           {page === "Календарь" && <Calendar items={items} />}{" "}
@@ -189,6 +196,14 @@ export default function Dashboard({ user }: { user: User }) {
           model={models.find((m) => m.id === selectedItem.model_id)}
           close={() => setSelectedItem(null)}
           save={updateItem}
+        />
+      )}
+      {weekOpen && (
+        <WeekPlanner
+          models={models}
+          history={items.slice(0, 20)}
+          close={() => setWeekOpen(false)}
+          save={saveWeek}
         />
       )}
     </div>
@@ -275,12 +290,14 @@ function Studio({
   add,
   status,
   open,
+  plan,
 }: {
   items: Item[];
   models: Model[];
   add: () => void;
   status: (i: Item, s: string) => void;
   open: (i: Item) => void;
+  plan: () => void;
 }) {
   return (
     <>
@@ -290,7 +307,7 @@ function Studio({
           <h2>Контент от идеи до публикации</h2>
           <p>Общий производственный поток для всей команды.</p>
         </div>
-        <button onClick={add}>✦ Создать контент</button>
+        <div className="studio-actions"><button className="week-button" onClick={plan}>▦ Создать неделю</button><button onClick={add}>✦ Один материал</button></div>
       </div>
       {items.length ? (
         <ContentList items={items} models={models} status={status} open={open} />
@@ -695,6 +712,12 @@ function ContentDialog({
       </div>
     </Modal>
   );
+}
+function WeekPlanner({models,history,close,save}:{models:Model[];history:Item[];close:()=>void;save:(x:Partial<Item>[])=>void}){
+  const [modelId,setModelId]=useState(models[0]?.id||""),[theme,setTheme]=useState(""),[goal,setGoal]=useState("Рост аудитории и укрепление образа модели"),[start,setStart]=useState(new Date().toISOString().slice(0,10)),[loading,setLoading]=useState(false),[error,setError]=useState(""),[plan,setPlan]=useState<{week_theme:string;strategy:string;posts:Array<Record<string,unknown>>}|null>(null);
+  async function create(){const model=models.find(m=>m.id===modelId);if(!model||!theme)return;setLoading(true);setError("");try{const r=await fetch('/api/plan-week',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({model,theme,goal,platforms:['Instagram','TikTok','Telegram'],history:history.map(x=>x.title)})}),data=await r.json();if(!r.ok)throw new Error(data.error);setPlan(data)}catch(e){setError(e instanceof Error?e.message:'Ошибка планирования')}finally{setLoading(false)}}
+  function commit(){if(!plan)return;const base=new Date(start+'T09:00:00');save(plan.posts.map((p)=>{const d=new Date(base);d.setDate(d.getDate()+Number(p.day_offset));const [h,m]=String(p.publish_time).split(':');d.setHours(Number(h),Number(m));return {model_id:modelId,title:String(p.title),platform:String(p.platform),format:String(p.format),status:'draft',caption:`${p.hook}\n\n${p.caption}\n\n${p.cta}\n\n${(p.hashtags as string[]).join(' ')}`,visual_prompt:String(p.visual_prompt),shot_list:p.shot_list as string[],publish_at:d.toISOString()}}))}
+  return <Modal close={close}><small>ATLAS WEEKLY DIRECTOR</small><h2>Создать неделю контента</h2>{!plan?<div className="form"><label>AI-модель<select value={modelId} onChange={e=>setModelId(e.target.value)}>{models.map(m=><option value={m.id}>{m.name}</option>)}</select></label><label>Главная тема недели<input value={theme} onChange={e=>setTheme(e.target.value)} placeholder="Например: мягкий переход к осеннему уходу"/></label><label>Цель недели<select value={goal} onChange={e=>setGoal(e.target.value)}><option>Рост аудитории и укрепление образа модели</option><option>Вовлечение существующей аудитории</option><option>Подготовка к рекламной интеграции</option><option>Продвижение продукта</option></select></label><label>Начало недели<input type="date" value={start} onChange={e=>setStart(e.target.value)}/></label><div className="week-info">Один AI-запрос создаст 7 связанных публикаций, не повторяя последние материалы.</div><button onClick={create} disabled={loading||!theme}>{loading?'Atlas планирует неделю…':'✦ Создать недельный план'}</button>{error&&<strong className="generation-error">{error}</strong>}</div>:<div className="week-result"><div className="week-summary"><small>ТЕМА НЕДЕЛИ</small><h3>{plan.week_theme}</h3><p>{plan.strategy}</p></div><div className="week-posts">{plan.posts.map((p,i)=><article><span>{i+1}</span><div><b>{String(p.title)}</b><small>{String(p.platform)} · {String(p.format)} · {String(p.publish_time)}</small></div><i>{String(p.goal)}</i></article>)}</div><div className="week-actions"><button onClick={()=>setPlan(null)}>Изменить задачу</button><button onClick={commit}>✓ Добавить 7 публикаций в календарь</button></div></div>}</Modal>
 }
 function PublicationDialog({item,model,close,save}:{item:Item;model?:Model;close:()=>void;save:(x:Partial<Item>)=>void}){
   const [draft,setDraft]=useState<Partial<Item>>(item),[tab,setTab]=useState("Предпросмотр");
