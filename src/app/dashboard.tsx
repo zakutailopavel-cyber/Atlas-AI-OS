@@ -1,15 +1,691 @@
-'use client';import {useEffect,useMemo,useState} from 'react';import {createClient} from '@/utils/supabase/client';
-type User={id:string,email:string,role:string};type Model={id:string,name:string,handle:string|null,niche:string|null,bio:string|null,status:string,visual_passport:Record<string,string>|null,created_by:string};type Item={id:string,model_id:string|null,title:string,platform:string|null,format:string|null,status:string,caption:string|null,visual_prompt:string|null,shot_list:string[]|null,publish_at:string|null,created_by:string};
-const menu=['Главная','AI-модели','Контент-студия','Календарь','Команда','Настройки'];
-export default function Dashboard({user}:{user:User}){const s=useMemo(()=>createClient(),[]),[page,setPage]=useState('Главная'),[models,setModels]=useState<Model[]>([]),[items,setItems]=useState<Item[]>([]),[team,setTeam]=useState<{email:string,role:string}[]>([]),[loading,setLoading]=useState(true),[modelOpen,setModelOpen]=useState<Model|null|undefined>(),[contentOpen,setContentOpen]=useState(false);async function load(){setLoading(true);const [m,c,t]=await Promise.all([s.from('ai_models').select('*').order('created_at'),s.from('content_items').select('*').order('created_at',{ascending:false}),s.from('profiles').select('email,role').order('created_at')]);setModels(m.data||[]);setItems(c.data||[]);setTeam(t.data||[]);setLoading(false)}useEffect(()=>{load()},[]);async function saveModel(m:Partial<Model>){if(m.id)await s.from('ai_models').update({name:m.name,handle:m.handle,niche:m.niche,bio:m.bio,status:m.status,visual_passport:m.visual_passport}).eq('id',m.id);else await s.from('ai_models').insert({...m,created_by:user.id});setModelOpen(undefined);load()}async function saveItem(x:Partial<Item>){await s.from('content_items').insert({...x,created_by:user.id});setContentOpen(false);load()}async function status(item:Item,next:string){await s.from('content_items').update({status:next}).eq('id',item.id);load()}return <div className="app"><aside><div className="brand"><b>A</b><span>ATLAS<small>AI OPERATING SYSTEM</small></span></div><nav>{menu.map((n,i)=><button className={page===n?'active':''} onClick={()=>setPage(n)}>{['⌂','◉','✦','▦','♙','⚙'][i]} {n}</button>)}</nav><div className="user"><b>{user.email.slice(0,2).toUpperCase()}</b><span>{user.email}<small>{user.role==='owner'?'Владелец':'Редактор'}</small></span></div></aside><main><header><div><small>РАБОЧЕЕ ПРОСТРАНСТВО ATLAS</small><h1>{page}</h1></div><span>● {loading?'Синхронизация…':'Все данные сохранены'}</span></header><div className="content">{page==='Главная'&&<Home models={models} items={items} create={()=>setContentOpen(true)}/>} {page==='AI-модели'&&<Models models={models} add={()=>setModelOpen(null)} edit={setModelOpen}/>} {page==='Контент-студия'&&<Studio items={items} models={models} add={()=>setContentOpen(true)} status={status}/>} {page==='Календарь'&&<Calendar items={items}/>} {page==='Команда'&&<Team team={team}/>} {page==='Настройки'&&<Settings user={user}/>}</div></main>{modelOpen!==undefined&&<ModelDialog model={modelOpen} close={()=>setModelOpen(undefined)} save={saveModel}/>} {contentOpen&&<ContentDialog models={models} close={()=>setContentOpen(false)} save={saveItem}/>}</div>}
-function Home({models,items,create}:{models:Model[],items:Item[],create:()=>void}){return <><section className="hero"><small>ТВОЯ КОНТЕНТ-ФАБРИКА</small><h2>Творческая вселенная<br/><em>работает вместе.</em></h2><p>Модели, идеи и публикации доступны команде в одном закрытом пространстве.</p><button onClick={create}>✦ Создать контент</button></section><div className="stats">{[['AI-МОДЕЛИ',models.length],['КОНТЕНТ',items.length],['ГОТОВО',items.filter(x=>x.status==='ready').length],['ЗАПЛАНИРОВАНО',items.filter(x=>x.publish_at).length]].map(x=><article><small>{x[0]}</small><b>{x[1]}</b><span>общая база</span></article>)}</div><h2>Последние публикации</h2><ContentList items={items.slice(0,5)} models={models}/></>}
-function Models({models,add,edit}:{models:Model[],add:()=>void,edit:(m:Model)=>void}){return <><div className="toolbar"><p>Создавай постоянные цифровые личности для всех каналов.</p><button onClick={add}>+ Новая AI-модель</button></div>{models.length?<div className="models">{models.map((m,i)=><article onClick={()=>edit(m)}><div className={'portrait p'+i%3}/><h3>{m.name}</h3><p>{m.niche||'Ниша не указана'}</p><small>{m.status}</small></article>)}</div>:<Empty text="Пока нет AI-моделей" action={add}/>}</>}
-function Studio({items,models,add,status}:{items:Item[],models:Model[],add:()=>void,status:(i:Item,s:string)=>void}){return <><div className="studio"><div><small>ATLAS CREATIVE ENGINE</small><h2>Контент от идеи до публикации</h2><p>Общий производственный поток для всей команды.</p></div><button onClick={add}>✦ Создать контент</button></div>{items.length?<ContentList items={items} models={models} status={status}/>:<Empty text="Контент-план пока пуст" action={add}/>}</>}
-function ContentList({items,models,status}:{items:Item[],models:Model[],status?:(i:Item,s:string)=>void}){return <div className="list">{items.map(x=><article><i>{x.format?.includes('Reel')?'▶':'▧'}</i><div><b>{x.title}</b><small>{models.find(m=>m.id===x.model_id)?.name||'Без модели'} · {x.format}</small></div><span>{x.platform}</span><span>{x.publish_at?new Date(x.publish_at).toLocaleString('ru-RU'):'Не запланировано'}</span>{status?<select value={x.status} onChange={e=>status(x,e.target.value)}><option value="draft">Черновик</option><option value="review">Проверка</option><option value="ready">Готово</option><option value="published">Опубликовано</option></select>:<strong>{x.status}</strong>}</article>)}</div>}
-function Calendar({items}:{items:Item[]}){const planned=items.filter(x=>x.publish_at);return <><div className="toolbar"><h2>Ближайшие публикации</h2><span>{planned.length} запланировано</span></div>{planned.length?<div className="agenda">{planned.sort((a,b)=>String(a.publish_at).localeCompare(String(b.publish_at))).map(x=><article><time>{new Date(x.publish_at!).toLocaleDateString('ru-RU',{day:'2-digit',month:'long'})}</time><div><b>{x.title}</b><p>{x.platform} · {x.format}</p></div><span>{new Date(x.publish_at!).toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'})}</span></article>)}</div>:<Empty text="Запланированных публикаций пока нет"/>}</>}
-function Team({team}:{team:{email:string,role:string}[]}){return <div className="team">{team.map(x=><article><b>{x.email.slice(0,2).toUpperCase()}</b><div><h3>{x.email}</h3><p>{x.role==='owner'?'Полный доступ и управление':'Модели, контент и календарь'}</p></div><span>{x.role==='owner'?'Владелец':'Редактор'}</span></article>)}</div>}
-function Settings({user}:{user:User}){return <div className="settings"><h2>Настройки пространства</h2><label>Название<input value="Atlas AI OS" readOnly/></label><label>Текущий пользователь<input value={user.email} readOnly/></label><section><b>Поисковая приватность включена</b><p>Все поисковые роботы получают запрет на индексацию. Доступ к данным требует авторизации.</p></section></div>}
-function ModelDialog({model,close,save}:{model:Model|null,close:()=>void,save:(m:Partial<Model>)=>void}){const [m,setM]=useState<Partial<Model>>(model||{name:'',handle:'',niche:'',bio:'',status:'draft',visual_passport:{seed:String(Math.floor(Math.random()*900000+100000)),appearance:'',tone:''}});return <Modal close={close}><small>ВИЗУАЛЬНАЯ ЛИЧНОСТЬ</small><h2>{model?'Редактировать модель':'Новая AI-модель'}</h2><div className="form">{(['name','handle','niche','bio'] as const).map(k=><label>{({name:'Имя',handle:'Профиль',niche:'Ниша',bio:'Описание'} as Record<string,string>)[k]}<input value={m[k]||''} onChange={e=>setM({...m,[k]:e.target.value})}/></label>)}<label>Описание внешности<textarea value={m.visual_passport?.appearance||''} onChange={e=>setM({...m,visual_passport:{...m.visual_passport,appearance:e.target.value}})}/></label><label>Seed<input value={m.visual_passport?.seed||''} onChange={e=>setM({...m,visual_passport:{...m.visual_passport,seed:e.target.value}})}/></label><button onClick={()=>m.name&&save(m)}>Сохранить модель</button></div></Modal>}
-function ContentDialog({models,close,save}:{models:Model[],close:()=>void,save:(x:Partial<Item>)=>void}){const [topic,setTopic]=useState(''),[goal,setGoal]=useState('Вовлечение аудитории'),[generated,setGenerated]=useState(false),[x,setX]=useState<Partial<Item>>({title:'',model_id:models[0]?.id||null,platform:'Instagram',format:'Reels',status:'draft',caption:'',visual_prompt:'',shot_list:[],publish_at:null});function generate(){const m=models.find(v=>v.id===x.model_id),v=m?.visual_passport||{},voice=v.tone||'тёплый, близкий и уверенный',appearance=v.appearance||'consistent natural appearance',seed=v.seed||'482193';setX({...x,title:`${topic}: маленькая привычка, которая меняет день`,caption:`Иногда самые заметные перемены начинаются с простого ритуала. Сегодня я хочу рассказать, как ${topic.toLowerCase()} помогает замедлиться, вернуть внимание к себе и сделать обычный день немного красивее.\n\nСохрани эту идею, чтобы попробовать позже. А какой маленький ритуал поддерживает тебя?\n\n#slow生活 #dailyritual #inspiration`,visual_prompt:`Photorealistic editorial ${String(x.format).toLowerCase()} featuring ${m?.name||'digital creator'}, ${appearance}. Scene about ${topic}. Warm natural window light, candid lifestyle photography, premium social media aesthetic, consistent identity, natural skin texture. Voice and mood: ${voice}. Fixed seed ${seed}. Negative: different face, plastic skin, text, logo, watermark, extra fingers.`,shot_list:[`Эмоциональный хук: «${topic}»`,'Общий план пространства и атмосферы','Крупная деталь действия или продукта','Живой портрет модели без взгляда в камеру',`Финальный кадр и CTA для цели «${goal}»`]});setGenerated(true)}return <Modal close={close}><small>ATLAS CREATIVE ENGINE</small><h2>Создать пакет контента</h2><div className="form"><label>AI-модель<select value={x.model_id||''} onChange={e=>setX({...x,model_id:e.target.value})}>{models.map(m=><option value={m.id}>{m.name}</option>)}</select></label><div className="cols"><label>Площадка<select value={x.platform||''} onChange={e=>setX({...x,platform:e.target.value})}><option>Instagram</option><option>TikTok</option><option>YouTube Shorts</option><option>Telegram</option></select></label><label>Формат<select value={x.format||''} onChange={e=>setX({...x,format:e.target.value})}><option>Reels</option><option>Карусель</option><option>Пост</option><option>Stories</option></select></label></div><label>Тема или идея<input value={topic} onChange={e=>setTopic(e.target.value)} placeholder="Например: спокойный воскресный уход"/></label><label>Цель<select value={goal} onChange={e=>setGoal(e.target.value)}><option>Вовлечение аудитории</option><option>Рост охвата</option><option>Укрепление образа модели</option><option>Продажа продукта</option><option>Рекламная интеграция</option></select></label>{!generated&&<button className="generate" onClick={generate} disabled={!topic||!models.length}>✦ Сгенерировать пакет</button>}{generated&&<><label>Название<input value={x.title||''} onChange={e=>setX({...x,title:e.target.value})}/></label><label>Текст<textarea value={x.caption||''} onChange={e=>setX({...x,caption:e.target.value})}/></label><label>Покадровый сценарий<textarea value={(x.shot_list||[]).join('\n')} onChange={e=>setX({...x,shot_list:e.target.value.split('\n')})}/></label><label>Визуальный промпт<textarea value={x.visual_prompt||''} onChange={e=>setX({...x,visual_prompt:e.target.value})}/></label><label>Дата публикации<input type="datetime-local" onChange={e=>setX({...x,publish_at:e.target.value?new Date(e.target.value).toISOString():null})}/></label><button onClick={()=>x.title&&save(x)}>Сохранить в контент-план</button></>}</div></Modal>}
-function Modal({children,close}:{children:React.ReactNode,close:()=>void}){return <div className="overlay"><section className="modal"><button className="close" onClick={close}>×</button>{children}</section></div>}
-function Empty({text,action}:{text:string,action?:()=>void}){return <div className="empty"><b>{text}</b>{action&&<button onClick={action}>Создать</button>}</div>}
+"use client";
+import { useEffect, useMemo, useState } from "react";
+import { createClient } from "@/utils/supabase/client";
+type User = { id: string; email: string; role: string };
+type Model = {
+  id: string;
+  name: string;
+  handle: string | null;
+  niche: string | null;
+  bio: string | null;
+  status: string;
+  visual_passport: Record<string, string> | null;
+  created_by: string;
+};
+type Item = {
+  id: string;
+  model_id: string | null;
+  title: string;
+  platform: string | null;
+  format: string | null;
+  status: string;
+  caption: string | null;
+  visual_prompt: string | null;
+  shot_list: string[] | null;
+  publish_at: string | null;
+  created_by: string;
+};
+const menu = [
+  "Главная",
+  "AI-модели",
+  "Контент-студия",
+  "Календарь",
+  "Команда",
+  "Настройки",
+];
+export default function Dashboard({ user }: { user: User }) {
+  const s = useMemo(() => createClient(), []),
+    [page, setPage] = useState("Главная"),
+    [models, setModels] = useState<Model[]>([]),
+    [items, setItems] = useState<Item[]>([]),
+    [team, setTeam] = useState<{ email: string; role: string }[]>([]),
+    [loading, setLoading] = useState(true),
+    [modelOpen, setModelOpen] = useState<Model | null | undefined>(),
+    [contentOpen, setContentOpen] = useState(false);
+  async function load() {
+    setLoading(true);
+    const [m, c, t] = await Promise.all([
+      s.from("ai_models").select("*").order("created_at"),
+      s
+        .from("content_items")
+        .select("*")
+        .order("created_at", { ascending: false }),
+      s.from("profiles").select("email,role").order("created_at"),
+    ]);
+    setModels(m.data || []);
+    setItems(c.data || []);
+    setTeam(t.data || []);
+    setLoading(false);
+  }
+  useEffect(() => {
+    load();
+  }, []);
+  async function saveModel(m: Partial<Model>) {
+    if (m.id)
+      await s
+        .from("ai_models")
+        .update({
+          name: m.name,
+          handle: m.handle,
+          niche: m.niche,
+          bio: m.bio,
+          status: m.status,
+          visual_passport: m.visual_passport,
+        })
+        .eq("id", m.id);
+    else await s.from("ai_models").insert({ ...m, created_by: user.id });
+    setModelOpen(undefined);
+    load();
+  }
+  async function saveItem(x: Partial<Item>) {
+    await s.from("content_items").insert({ ...x, created_by: user.id });
+    setContentOpen(false);
+    load();
+  }
+  async function status(item: Item, next: string) {
+    await s.from("content_items").update({ status: next }).eq("id", item.id);
+    load();
+  }
+  return (
+    <div className="app">
+      <aside>
+        <div className="brand">
+          <b>A</b>
+          <span>
+            ATLAS<small>AI OPERATING SYSTEM</small>
+          </span>
+        </div>
+        <nav>
+          {menu.map((n, i) => (
+            <button
+              className={page === n ? "active" : ""}
+              onClick={() => setPage(n)}
+            >
+              {["⌂", "◉", "✦", "▦", "♙", "⚙"][i]} {n}
+            </button>
+          ))}
+        </nav>
+        <div className="user">
+          <b>{user.email.slice(0, 2).toUpperCase()}</b>
+          <span>
+            {user.email}
+            <small>{user.role === "owner" ? "Владелец" : "Редактор"}</small>
+          </span>
+        </div>
+      </aside>
+      <main>
+        <header>
+          <div>
+            <small>РАБОЧЕЕ ПРОСТРАНСТВО ATLAS</small>
+            <h1>{page}</h1>
+          </div>
+          <span>● {loading ? "Синхронизация…" : "Все данные сохранены"}</span>
+        </header>
+        <div className="content">
+          {page === "Главная" && (
+            <Home
+              models={models}
+              items={items}
+              create={() => setContentOpen(true)}
+            />
+          )}{" "}
+          {page === "AI-модели" && (
+            <Models
+              models={models}
+              add={() => setModelOpen(null)}
+              edit={setModelOpen}
+            />
+          )}{" "}
+          {page === "Контент-студия" && (
+            <Studio
+              items={items}
+              models={models}
+              add={() => setContentOpen(true)}
+              status={status}
+            />
+          )}{" "}
+          {page === "Календарь" && <Calendar items={items} />}{" "}
+          {page === "Команда" && <Team team={team} />}{" "}
+          {page === "Настройки" && <Settings user={user} />}
+        </div>
+      </main>
+      {modelOpen !== undefined && (
+        <ModelDialog
+          model={modelOpen}
+          close={() => setModelOpen(undefined)}
+          save={saveModel}
+        />
+      )}{" "}
+      {contentOpen && (
+        <ContentDialog
+          models={models}
+          close={() => setContentOpen(false)}
+          save={saveItem}
+        />
+      )}
+    </div>
+  );
+}
+function Home({
+  models,
+  items,
+  create,
+}: {
+  models: Model[];
+  items: Item[];
+  create: () => void;
+}) {
+  return (
+    <>
+      <section className="hero">
+        <small>ТВОЯ КОНТЕНТ-ФАБРИКА</small>
+        <h2>
+          Творческая вселенная
+          <br />
+          <em>работает вместе.</em>
+        </h2>
+        <p>
+          Модели, идеи и публикации доступны команде в одном закрытом
+          пространстве.
+        </p>
+        <button onClick={create}>✦ Создать контент</button>
+      </section>
+      <div className="stats">
+        {[
+          ["AI-МОДЕЛИ", models.length],
+          ["КОНТЕНТ", items.length],
+          ["ГОТОВО", items.filter((x) => x.status === "ready").length],
+          ["ЗАПЛАНИРОВАНО", items.filter((x) => x.publish_at).length],
+        ].map((x) => (
+          <article>
+            <small>{x[0]}</small>
+            <b>{x[1]}</b>
+            <span>общая база</span>
+          </article>
+        ))}
+      </div>
+      <h2>Последние публикации</h2>
+      <ContentList items={items.slice(0, 5)} models={models} />
+    </>
+  );
+}
+function Models({
+  models,
+  add,
+  edit,
+}: {
+  models: Model[];
+  add: () => void;
+  edit: (m: Model) => void;
+}) {
+  return (
+    <>
+      <div className="toolbar">
+        <p>Создавай постоянные цифровые личности для всех каналов.</p>
+        <button onClick={add}>+ Новая AI-модель</button>
+      </div>
+      {models.length ? (
+        <div className="models">
+          {models.map((m, i) => (
+            <article onClick={() => edit(m)}>
+              <div className={"portrait p" + (i % 3)} />
+              <h3>{m.name}</h3>
+              <p>{m.niche || "Ниша не указана"}</p>
+              <small>{m.status}</small>
+            </article>
+          ))}
+        </div>
+      ) : (
+        <Empty text="Пока нет AI-моделей" action={add} />
+      )}
+    </>
+  );
+}
+function Studio({
+  items,
+  models,
+  add,
+  status,
+}: {
+  items: Item[];
+  models: Model[];
+  add: () => void;
+  status: (i: Item, s: string) => void;
+}) {
+  return (
+    <>
+      <div className="studio">
+        <div>
+          <small>ATLAS CREATIVE ENGINE</small>
+          <h2>Контент от идеи до публикации</h2>
+          <p>Общий производственный поток для всей команды.</p>
+        </div>
+        <button onClick={add}>✦ Создать контент</button>
+      </div>
+      {items.length ? (
+        <ContentList items={items} models={models} status={status} />
+      ) : (
+        <Empty text="Контент-план пока пуст" action={add} />
+      )}
+    </>
+  );
+}
+function ContentList({
+  items,
+  models,
+  status,
+}: {
+  items: Item[];
+  models: Model[];
+  status?: (i: Item, s: string) => void;
+}) {
+  return (
+    <div className="list">
+      {items.map((x) => (
+        <article>
+          <i>{x.format?.includes("Reel") ? "▶" : "▧"}</i>
+          <div>
+            <b>{x.title}</b>
+            <small>
+              {models.find((m) => m.id === x.model_id)?.name || "Без модели"} ·{" "}
+              {x.format}
+            </small>
+          </div>
+          <span>{x.platform}</span>
+          <span>
+            {x.publish_at
+              ? new Date(x.publish_at).toLocaleString("ru-RU")
+              : "Не запланировано"}
+          </span>
+          {status ? (
+            <select
+              value={x.status}
+              onChange={(e) => status(x, e.target.value)}
+            >
+              <option value="draft">Черновик</option>
+              <option value="review">Проверка</option>
+              <option value="ready">Готово</option>
+              <option value="published">Опубликовано</option>
+            </select>
+          ) : (
+            <strong>{x.status}</strong>
+          )}
+        </article>
+      ))}
+    </div>
+  );
+}
+function Calendar({ items }: { items: Item[] }) {
+  const planned = items.filter((x) => x.publish_at);
+  return (
+    <>
+      <div className="toolbar">
+        <h2>Ближайшие публикации</h2>
+        <span>{planned.length} запланировано</span>
+      </div>
+      {planned.length ? (
+        <div className="agenda">
+          {planned
+            .sort((a, b) =>
+              String(a.publish_at).localeCompare(String(b.publish_at)),
+            )
+            .map((x) => (
+              <article>
+                <time>
+                  {new Date(x.publish_at!).toLocaleDateString("ru-RU", {
+                    day: "2-digit",
+                    month: "long",
+                  })}
+                </time>
+                <div>
+                  <b>{x.title}</b>
+                  <p>
+                    {x.platform} · {x.format}
+                  </p>
+                </div>
+                <span>
+                  {new Date(x.publish_at!).toLocaleTimeString("ru-RU", {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })}
+                </span>
+              </article>
+            ))}
+        </div>
+      ) : (
+        <Empty text="Запланированных публикаций пока нет" />
+      )}
+    </>
+  );
+}
+function Team({ team }: { team: { email: string; role: string }[] }) {
+  return (
+    <div className="team">
+      {team.map((x) => (
+        <article>
+          <b>{x.email.slice(0, 2).toUpperCase()}</b>
+          <div>
+            <h3>{x.email}</h3>
+            <p>
+              {x.role === "owner"
+                ? "Полный доступ и управление"
+                : "Модели, контент и календарь"}
+            </p>
+          </div>
+          <span>{x.role === "owner" ? "Владелец" : "Редактор"}</span>
+        </article>
+      ))}
+    </div>
+  );
+}
+function Settings({ user }: { user: User }) {
+  return (
+    <div className="settings">
+      <h2>Настройки пространства</h2>
+      <label>
+        Название
+        <input value="Atlas AI OS" readOnly />
+      </label>
+      <label>
+        Текущий пользователь
+        <input value={user.email} readOnly />
+      </label>
+      <section>
+        <b>Поисковая приватность включена</b>
+        <p>
+          Все поисковые роботы получают запрет на индексацию. Доступ к данным
+          требует авторизации.
+        </p>
+      </section>
+    </div>
+  );
+}
+function ModelDialog({
+  model,
+  close,
+  save,
+}: {
+  model: Model | null;
+  close: () => void;
+  save: (m: Partial<Model>) => void;
+}) {
+  const [m, setM] = useState<Partial<Model>>(
+    model || {
+      name: "",
+      handle: "",
+      niche: "",
+      bio: "",
+      status: "draft",
+      visual_passport: {
+        seed: String(Math.floor(Math.random() * 900000 + 100000)),
+        appearance: "",
+        tone: "",
+      },
+    },
+  );
+  return (
+    <Modal close={close}>
+      <small>ВИЗУАЛЬНАЯ ЛИЧНОСТЬ</small>
+      <h2>{model ? "Редактировать модель" : "Новая AI-модель"}</h2>
+      <div className="form">
+        {(["name", "handle", "niche", "bio"] as const).map((k) => (
+          <label>
+            {
+              (
+                {
+                  name: "Имя",
+                  handle: "Профиль",
+                  niche: "Ниша",
+                  bio: "Описание",
+                } as Record<string, string>
+              )[k]
+            }
+            <input
+              value={m[k] || ""}
+              onChange={(e) => setM({ ...m, [k]: e.target.value })}
+            />
+          </label>
+        ))}
+        <label>
+          Описание внешности
+          <textarea
+            value={m.visual_passport?.appearance || ""}
+            onChange={(e) =>
+              setM({
+                ...m,
+                visual_passport: {
+                  ...m.visual_passport,
+                  appearance: e.target.value,
+                },
+              })
+            }
+          />
+        </label>
+        <label>
+          Seed
+          <input
+            value={m.visual_passport?.seed || ""}
+            onChange={(e) =>
+              setM({
+                ...m,
+                visual_passport: { ...m.visual_passport, seed: e.target.value },
+              })
+            }
+          />
+        </label>
+        <button onClick={() => m.name && save(m)}>Сохранить модель</button>
+      </div>
+    </Modal>
+  );
+}
+function ContentDialog({
+  models,
+  close,
+  save,
+}: {
+  models: Model[];
+  close: () => void;
+  save: (x: Partial<Item>) => void;
+}) {
+  const [topic, setTopic] = useState(""),
+    [goal, setGoal] = useState("Вовлечение аудитории"),
+    [generated, setGenerated] = useState(false),
+    [generating, setGenerating] = useState(false),
+    [generationError, setGenerationError] = useState(""),
+    [x, setX] = useState<Partial<Item>>({
+      title: "",
+      model_id: models[0]?.id || null,
+      platform: "Instagram",
+      format: "Reels",
+      status: "draft",
+      caption: "",
+      visual_prompt: "",
+      shot_list: [],
+      publish_at: null,
+    });
+  async function generate() {
+    const model = models.find((v) => v.id === x.model_id);
+    if (!model) return;
+    setGenerating(true);
+    setGenerationError("");
+    try {
+      const response = await fetch("/api/generate", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          model,
+          topic,
+          goal,
+          platform: x.platform,
+          format: x.format,
+        }),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || "Ошибка генерации");
+      setX({
+        ...x,
+        title: result.title,
+        caption: `${result.hook}\n\n${result.caption}\n\n${result.cta}\n\n${result.hashtags.join(" ")}`,
+        visual_prompt: `${result.visual_prompt}\n\nNegative: ${result.negative_prompt}`,
+        shot_list: result.shot_list,
+      });
+      setGenerated(true);
+    } catch (error) {
+      setGenerationError(
+        error instanceof Error ? error.message : "AI-генерация не удалась",
+      );
+    } finally {
+      setGenerating(false);
+    }
+  }
+  return (
+    <Modal close={close}>
+      <small>ATLAS CREATIVE ENGINE</small>
+      <h2>Создать пакет контента</h2>
+      <div className="form">
+        <label>
+          AI-модель
+          <select
+            value={x.model_id || ""}
+            onChange={(e) => setX({ ...x, model_id: e.target.value })}
+          >
+            {models.map((m) => (
+              <option value={m.id}>{m.name}</option>
+            ))}
+          </select>
+        </label>
+        <div className="cols">
+          <label>
+            Площадка
+            <select
+              value={x.platform || ""}
+              onChange={(e) => setX({ ...x, platform: e.target.value })}
+            >
+              <option>Instagram</option>
+              <option>TikTok</option>
+              <option>YouTube Shorts</option>
+              <option>Telegram</option>
+            </select>
+          </label>
+          <label>
+            Формат
+            <select
+              value={x.format || ""}
+              onChange={(e) => setX({ ...x, format: e.target.value })}
+            >
+              <option>Reels</option>
+              <option>Карусель</option>
+              <option>Пост</option>
+              <option>Stories</option>
+            </select>
+          </label>
+        </div>
+        <label>
+          Тема или идея
+          <input
+            value={topic}
+            onChange={(e) => setTopic(e.target.value)}
+            placeholder="Например: спокойный воскресный уход"
+          />
+        </label>
+        <label>
+          Цель
+          <select value={goal} onChange={(e) => setGoal(e.target.value)}>
+            <option>Вовлечение аудитории</option>
+            <option>Рост охвата</option>
+            <option>Укрепление образа модели</option>
+            <option>Продажа продукта</option>
+            <option>Рекламная интеграция</option>
+          </select>
+        </label>
+        {!generated && (
+          <button
+            className="generate"
+            onClick={generate}
+            disabled={!topic || !models.length || generating}
+          >
+            {generating ? "Atlas создаёт магию…" : "✦ Сгенерировать с OpenAI"}
+          </button>
+        )}
+        {generationError && <strong className="generation-error">{generationError}</strong>}
+        {generated && (
+          <>
+            <label>
+              Название
+              <input
+                value={x.title || ""}
+                onChange={(e) => setX({ ...x, title: e.target.value })}
+              />
+            </label>
+            <label>
+              Текст
+              <textarea
+                value={x.caption || ""}
+                onChange={(e) => setX({ ...x, caption: e.target.value })}
+              />
+            </label>
+            <label>
+              Покадровый сценарий
+              <textarea
+                value={(x.shot_list || []).join("\n")}
+                onChange={(e) =>
+                  setX({ ...x, shot_list: e.target.value.split("\n") })
+                }
+              />
+            </label>
+            <label>
+              Визуальный промпт
+              <textarea
+                value={x.visual_prompt || ""}
+                onChange={(e) => setX({ ...x, visual_prompt: e.target.value })}
+              />
+            </label>
+            <label>
+              Дата публикации
+              <input
+                type="datetime-local"
+                onChange={(e) =>
+                  setX({
+                    ...x,
+                    publish_at: e.target.value
+                      ? new Date(e.target.value).toISOString()
+                      : null,
+                  })
+                }
+              />
+            </label>
+            <button onClick={() => x.title && save(x)}>
+              Сохранить в контент-план
+            </button>
+          </>
+        )}
+      </div>
+    </Modal>
+  );
+}
+function Modal({
+  children,
+  close,
+}: {
+  children: React.ReactNode;
+  close: () => void;
+}) {
+  return (
+    <div className="overlay">
+      <section className="modal">
+        <button className="close" onClick={close}>
+          ×
+        </button>
+        {children}
+      </section>
+    </div>
+  );
+}
+function Empty({ text, action }: { text: string; action?: () => void }) {
+  return (
+    <div className="empty">
+      <b>{text}</b>
+      {action && <button onClick={action}>Создать</button>}
+    </div>
+  );
+}
