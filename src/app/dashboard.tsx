@@ -87,7 +87,9 @@ export default function Dashboard({ user }: { user: User }) {
     load();
   }
   async function saveWeek(posts: Partial<Item>[]) {
-    await s.from("content_items").insert(posts.map((x) => ({ ...x, created_by: user.id })));
+    await s
+      .from("content_items")
+      .insert(posts.map((x) => ({ ...x, created_by: user.id })));
     setWeekOpen(false);
     load();
   }
@@ -307,10 +309,20 @@ function Studio({
           <h2>Контент от идеи до публикации</h2>
           <p>Общий производственный поток для всей команды.</p>
         </div>
-        <div className="studio-actions"><button className="week-button" onClick={plan}>▦ Создать неделю</button><button onClick={add}>✦ Один материал</button></div>
+        <div className="studio-actions">
+          <button className="week-button" onClick={plan}>
+            ▦ Создать неделю
+          </button>
+          <button onClick={add}>✦ Один материал</button>
+        </div>
       </div>
       {items.length ? (
-        <ContentList items={items} models={models} status={status} open={open} />
+        <ContentList
+          items={items}
+          models={models}
+          status={status}
+          open={open}
+        />
       ) : (
         <Empty text="Контент-план пока пуст" action={add} />
       )}
@@ -459,70 +471,309 @@ function ModelDialog({
   close: () => void;
   save: (m: Partial<Model>) => void;
 }) {
-  const [m, setM] = useState<Partial<Model>>(
-    model || {
-      name: "",
-      handle: "",
-      niche: "",
-      bio: "",
-      status: "draft",
-      visual_passport: {
-        seed: String(Math.floor(Math.random() * 900000 + 100000)),
-        appearance: "",
-        tone: "",
+  const [tab, setTab] = useState("Личность"),
+    [m, setM] = useState<Partial<Model>>(
+      model || {
+        name: "",
+        handle: "",
+        niche: "",
+        bio: "",
+        status: "draft",
+        visual_passport: {
+          seed: String(Math.floor(Math.random() * 900000 + 100000)),
+          appearance: "",
+          tone: "",
+          biography: "",
+          audience: "",
+          values: "",
+          immutable_facts: "",
+          interests: "",
+          vocabulary: "",
+          forbidden_topics: "",
+          favorite_places: "",
+          brands: "",
+          storyline: "",
+        },
       },
-    },
-  );
+    );
   return (
     <Modal close={close}>
-      <small>ВИЗУАЛЬНАЯ ЛИЧНОСТЬ</small>
+      <small>ATLAS CHARACTER BRAIN</small>
       <h2>{model ? "Редактировать модель" : "Новая AI-модель"}</h2>
-      <div className="form">
-        {(["name", "handle", "niche", "bio"] as const).map((k) => (
+      <div className="brain-tabs">
+        {["Личность", "Внешность", "Память и сюжет"].map((x) => (
+          <button
+            className={tab === x ? "active" : ""}
+            onClick={() => setTab(x)}
+          >
+            {x}
+          </button>
+        ))}
+      </div>
+      {tab === "Личность" && (
+        <div className="form">
+          {(["name", "handle", "niche", "bio"] as const).map((k) => (
+            <label>
+              {
+                (
+                  {
+                    name: "Имя",
+                    handle: "Профиль",
+                    niche: "Ниша",
+                    bio: "Описание",
+                  } as Record<string, string>
+                )[k]
+              }
+              <input
+                value={m[k] || ""}
+                onChange={(e) => setM({ ...m, [k]: e.target.value })}
+              />
+            </label>
+          ))}
           <label>
-            {
-              (
-                {
-                  name: "Имя",
-                  handle: "Профиль",
-                  niche: "Ниша",
-                  bio: "Описание",
-                } as Record<string, string>
-              )[k]
-            }
-            <input
-              value={m[k] || ""}
-              onChange={(e) => setM({ ...m, [k]: e.target.value })}
+            Целевая аудитория
+            <textarea
+              value={m.visual_passport?.audience || ""}
+              onChange={(e) =>
+                setM({
+                  ...m,
+                  visual_passport: {
+                    ...m.visual_passport,
+                    audience: e.target.value,
+                  },
+                })
+              }
             />
           </label>
-        ))}
-        <label>
-          Описание внешности
-          <textarea
-            value={m.visual_passport?.appearance || ""}
-            onChange={(e) =>
-              setM({
-                ...m,
-                visual_passport: {
-                  ...m.visual_passport,
-                  appearance: e.target.value,
-                },
-              })
-            }
-          />
-        </label>
-        <label>
-          Seed
-          <input
-            value={m.visual_passport?.seed || ""}
-            onChange={(e) =>
-              setM({
-                ...m,
-                visual_passport: { ...m.visual_passport, seed: e.target.value },
-              })
-            }
-          />
-        </label>
+          <label>
+            Голос и манера общения
+            <textarea
+              value={m.visual_passport?.tone || ""}
+              onChange={(e) =>
+                setM({
+                  ...m,
+                  visual_passport: {
+                    ...m.visual_passport,
+                    tone: e.target.value,
+                  },
+                })
+              }
+              placeholder="Тёплая, уверенная, говорит короткими фразами…"
+            />
+          </label>
+          <label>
+            Ценности и мировоззрение
+            <textarea
+              value={m.visual_passport?.values || ""}
+              onChange={(e) =>
+                setM({
+                  ...m,
+                  visual_passport: {
+                    ...m.visual_passport,
+                    values: e.target.value,
+                  },
+                })
+              }
+            />
+          </label>
+        </div>
+      )}
+      {tab === "Внешность" && (
+        <div className="form">
+          <label>
+            Описание внешности
+            <textarea
+              value={m.visual_passport?.appearance || ""}
+              onChange={(e) =>
+                setM({
+                  ...m,
+                  visual_passport: {
+                    ...m.visual_passport,
+                    appearance: e.target.value,
+                  },
+                })
+              }
+            />
+          </label>
+          <label>
+            Seed
+            <input
+              value={m.visual_passport?.seed || ""}
+              onChange={(e) =>
+                setM({
+                  ...m,
+                  visual_passport: {
+                    ...m.visual_passport,
+                    seed: e.target.value,
+                  },
+                })
+              }
+            />
+          </label>
+          <label>
+            Стиль одежды и палитра
+            <textarea
+              value={m.visual_passport?.style || ""}
+              onChange={(e) =>
+                setM({
+                  ...m,
+                  visual_passport: {
+                    ...m.visual_passport,
+                    style: e.target.value,
+                  },
+                })
+              }
+            />
+          </label>
+          <label>
+            Negative prompt
+            <textarea
+              value={m.visual_passport?.negative || ""}
+              onChange={(e) =>
+                setM({
+                  ...m,
+                  visual_passport: {
+                    ...m.visual_passport,
+                    negative: e.target.value,
+                  },
+                })
+              }
+              placeholder="different face, plastic skin, text, watermark…"
+            />
+          </label>
+        </div>
+      )}
+      {tab === "Память и сюжет" && (
+        <div className="form brain-memory">
+          <label>
+            Биография персонажа
+            <textarea
+              value={m.visual_passport?.biography || ""}
+              onChange={(e) =>
+                setM({
+                  ...m,
+                  visual_passport: {
+                    ...m.visual_passport,
+                    biography: e.target.value,
+                  },
+                })
+              }
+              placeholder="Где родилась, чем занимается, как пришла к своему образу жизни…"
+            />
+          </label>
+          <label>
+            Факты, которые нельзя менять
+            <textarea
+              value={m.visual_passport?.immutable_facts || ""}
+              onChange={(e) =>
+                setM({
+                  ...m,
+                  visual_passport: {
+                    ...m.visual_passport,
+                    immutable_facts: e.target.value,
+                  },
+                })
+              }
+              placeholder="Возраст, город, образование, семейное положение…"
+            />
+          </label>
+          <label>
+            Интересы и привычки
+            <textarea
+              value={m.visual_passport?.interests || ""}
+              onChange={(e) =>
+                setM({
+                  ...m,
+                  visual_passport: {
+                    ...m.visual_passport,
+                    interests: e.target.value,
+                  },
+                })
+              }
+            />
+          </label>
+          <label>
+            Характерные слова и выражения
+            <textarea
+              value={m.visual_passport?.vocabulary || ""}
+              onChange={(e) =>
+                setM({
+                  ...m,
+                  visual_passport: {
+                    ...m.visual_passport,
+                    vocabulary: e.target.value,
+                  },
+                })
+              }
+            />
+          </label>
+          <label>
+            Любимые места
+            <textarea
+              value={m.visual_passport?.favorite_places || ""}
+              onChange={(e) =>
+                setM({
+                  ...m,
+                  visual_passport: {
+                    ...m.visual_passport,
+                    favorite_places: e.target.value,
+                  },
+                })
+              }
+            />
+          </label>
+          <label>
+            Бренды и действующие интеграции
+            <textarea
+              value={m.visual_passport?.brands || ""}
+              onChange={(e) =>
+                setM({
+                  ...m,
+                  visual_passport: {
+                    ...m.visual_passport,
+                    brands: e.target.value,
+                  },
+                })
+              }
+            />
+          </label>
+          <label>
+            Запрещённые темы
+            <textarea
+              value={m.visual_passport?.forbidden_topics || ""}
+              onChange={(e) =>
+                setM({
+                  ...m,
+                  visual_passport: {
+                    ...m.visual_passport,
+                    forbidden_topics: e.target.value,
+                  },
+                })
+              }
+            />
+          </label>
+          <label className="storyline">
+            Текущая сюжетная линия
+            <textarea
+              value={m.visual_passport?.storyline || ""}
+              onChange={(e) =>
+                setM({
+                  ...m,
+                  visual_passport: {
+                    ...m.visual_passport,
+                    storyline: e.target.value,
+                  },
+                })
+              }
+              placeholder="Что сейчас происходит в жизни модели и к чему ведём аудиторию в ближайшие недели…"
+            />
+          </label>
+        </div>
+      )}
+      <div className="brain-footer">
+        <span>
+          Эти данные автоматически используются всеми генераторами Atlas.
+        </span>
         <button onClick={() => m.name && save(m)}>Сохранить модель</button>
       </div>
     </Modal>
@@ -657,7 +908,9 @@ function ContentDialog({
             {generating ? "Atlas создаёт магию…" : "✦ Сгенерировать с OpenAI"}
           </button>
         )}
-        {generationError && <strong className="generation-error">{generationError}</strong>}
+        {generationError && (
+          <strong className="generation-error">{generationError}</strong>
+        )}
         {generated && (
           <>
             <label>
@@ -713,15 +966,302 @@ function ContentDialog({
     </Modal>
   );
 }
-function WeekPlanner({models,history,close,save}:{models:Model[];history:Item[];close:()=>void;save:(x:Partial<Item>[])=>void}){
-  const [modelId,setModelId]=useState(models[0]?.id||""),[theme,setTheme]=useState(""),[goal,setGoal]=useState("Рост аудитории и укрепление образа модели"),[start,setStart]=useState(new Date().toISOString().slice(0,10)),[loading,setLoading]=useState(false),[error,setError]=useState(""),[plan,setPlan]=useState<{week_theme:string;strategy:string;posts:Array<Record<string,unknown>>}|null>(null);
-  async function create(){const model=models.find(m=>m.id===modelId);if(!model||!theme)return;setLoading(true);setError("");try{const r=await fetch('/api/plan-week',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({model,theme,goal,platforms:['Instagram','TikTok','Telegram'],history:history.map(x=>x.title)})}),data=await r.json();if(!r.ok)throw new Error(data.error);setPlan(data)}catch(e){setError(e instanceof Error?e.message:'Ошибка планирования')}finally{setLoading(false)}}
-  function commit(){if(!plan)return;const base=new Date(start+'T09:00:00');save(plan.posts.map((p)=>{const d=new Date(base);d.setDate(d.getDate()+Number(p.day_offset));const [h,m]=String(p.publish_time).split(':');d.setHours(Number(h),Number(m));return {model_id:modelId,title:String(p.title),platform:String(p.platform),format:String(p.format),status:'draft',caption:`${p.hook}\n\n${p.caption}\n\n${p.cta}\n\n${(p.hashtags as string[]).join(' ')}`,visual_prompt:String(p.visual_prompt),shot_list:p.shot_list as string[],publish_at:d.toISOString()}}))}
-  return <Modal close={close}><small>ATLAS WEEKLY DIRECTOR</small><h2>Создать неделю контента</h2>{!plan?<div className="form"><label>AI-модель<select value={modelId} onChange={e=>setModelId(e.target.value)}>{models.map(m=><option value={m.id}>{m.name}</option>)}</select></label><label>Главная тема недели<input value={theme} onChange={e=>setTheme(e.target.value)} placeholder="Например: мягкий переход к осеннему уходу"/></label><label>Цель недели<select value={goal} onChange={e=>setGoal(e.target.value)}><option>Рост аудитории и укрепление образа модели</option><option>Вовлечение существующей аудитории</option><option>Подготовка к рекламной интеграции</option><option>Продвижение продукта</option></select></label><label>Начало недели<input type="date" value={start} onChange={e=>setStart(e.target.value)}/></label><div className="week-info">Один AI-запрос создаст 7 связанных публикаций, не повторяя последние материалы.</div><button onClick={create} disabled={loading||!theme}>{loading?'Atlas планирует неделю…':'✦ Создать недельный план'}</button>{error&&<strong className="generation-error">{error}</strong>}</div>:<div className="week-result"><div className="week-summary"><small>ТЕМА НЕДЕЛИ</small><h3>{plan.week_theme}</h3><p>{plan.strategy}</p></div><div className="week-posts">{plan.posts.map((p,i)=><article><span>{i+1}</span><div><b>{String(p.title)}</b><small>{String(p.platform)} · {String(p.format)} · {String(p.publish_time)}</small></div><i>{String(p.goal)}</i></article>)}</div><div className="week-actions"><button onClick={()=>setPlan(null)}>Изменить задачу</button><button onClick={commit}>✓ Добавить 7 публикаций в календарь</button></div></div>}</Modal>
+function WeekPlanner({
+  models,
+  history,
+  close,
+  save,
+}: {
+  models: Model[];
+  history: Item[];
+  close: () => void;
+  save: (x: Partial<Item>[]) => void;
+}) {
+  const [modelId, setModelId] = useState(models[0]?.id || ""),
+    [theme, setTheme] = useState(""),
+    [goal, setGoal] = useState("Рост аудитории и укрепление образа модели"),
+    [start, setStart] = useState(new Date().toISOString().slice(0, 10)),
+    [loading, setLoading] = useState(false),
+    [error, setError] = useState(""),
+    [plan, setPlan] = useState<{
+      week_theme: string;
+      strategy: string;
+      posts: Array<Record<string, unknown>>;
+    } | null>(null);
+  async function create() {
+    const model = models.find((m) => m.id === modelId);
+    if (!model || !theme) return;
+    setLoading(true);
+    setError("");
+    try {
+      const r = await fetch("/api/plan-week", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            model,
+            theme,
+            goal,
+            platforms: ["Instagram", "TikTok", "Telegram"],
+            history: history.map((x) => x.title),
+          }),
+        }),
+        data = await r.json();
+      if (!r.ok) throw new Error(data.error);
+      setPlan(data);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Ошибка планирования");
+    } finally {
+      setLoading(false);
+    }
+  }
+  function commit() {
+    if (!plan) return;
+    const base = new Date(start + "T09:00:00");
+    save(
+      plan.posts.map((p) => {
+        const d = new Date(base);
+        d.setDate(d.getDate() + Number(p.day_offset));
+        const [h, m] = String(p.publish_time).split(":");
+        d.setHours(Number(h), Number(m));
+        return {
+          model_id: modelId,
+          title: String(p.title),
+          platform: String(p.platform),
+          format: String(p.format),
+          status: "draft",
+          caption: `${p.hook}\n\n${p.caption}\n\n${p.cta}\n\n${(p.hashtags as string[]).join(" ")}`,
+          visual_prompt: String(p.visual_prompt),
+          shot_list: p.shot_list as string[],
+          publish_at: d.toISOString(),
+        };
+      }),
+    );
+  }
+  return (
+    <Modal close={close}>
+      <small>ATLAS WEEKLY DIRECTOR</small>
+      <h2>Создать неделю контента</h2>
+      {!plan ? (
+        <div className="form">
+          <label>
+            AI-модель
+            <select
+              value={modelId}
+              onChange={(e) => setModelId(e.target.value)}
+            >
+              {models.map((m) => (
+                <option value={m.id}>{m.name}</option>
+              ))}
+            </select>
+          </label>
+          <label>
+            Главная тема недели
+            <input
+              value={theme}
+              onChange={(e) => setTheme(e.target.value)}
+              placeholder="Например: мягкий переход к осеннему уходу"
+            />
+          </label>
+          <label>
+            Цель недели
+            <select value={goal} onChange={(e) => setGoal(e.target.value)}>
+              <option>Рост аудитории и укрепление образа модели</option>
+              <option>Вовлечение существующей аудитории</option>
+              <option>Подготовка к рекламной интеграции</option>
+              <option>Продвижение продукта</option>
+            </select>
+          </label>
+          <label>
+            Начало недели
+            <input
+              type="date"
+              value={start}
+              onChange={(e) => setStart(e.target.value)}
+            />
+          </label>
+          <div className="week-info">
+            Один AI-запрос создаст 7 связанных публикаций, не повторяя последние
+            материалы.
+          </div>
+          <button onClick={create} disabled={loading || !theme}>
+            {loading ? "Atlas планирует неделю…" : "✦ Создать недельный план"}
+          </button>
+          {error && <strong className="generation-error">{error}</strong>}
+        </div>
+      ) : (
+        <div className="week-result">
+          <div className="week-summary">
+            <small>ТЕМА НЕДЕЛИ</small>
+            <h3>{plan.week_theme}</h3>
+            <p>{plan.strategy}</p>
+          </div>
+          <div className="week-posts">
+            {plan.posts.map((p, i) => (
+              <article>
+                <span>{i + 1}</span>
+                <div>
+                  <b>{String(p.title)}</b>
+                  <small>
+                    {String(p.platform)} · {String(p.format)} ·{" "}
+                    {String(p.publish_time)}
+                  </small>
+                </div>
+                <i>{String(p.goal)}</i>
+              </article>
+            ))}
+          </div>
+          <div className="week-actions">
+            <button onClick={() => setPlan(null)}>Изменить задачу</button>
+            <button onClick={commit}>
+              ✓ Добавить 7 публикаций в календарь
+            </button>
+          </div>
+        </div>
+      )}
+    </Modal>
+  );
 }
-function PublicationDialog({item,model,close,save}:{item:Item;model?:Model;close:()=>void;save:(x:Partial<Item>)=>void}){
-  const [draft,setDraft]=useState<Partial<Item>>(item),[tab,setTab]=useState("Предпросмотр");
-  return <Modal close={close}><div className="publication-head"><div><small>{draft.platform} · {draft.format}</small><h2>{draft.title}</h2><p>{model?.name||"Без модели"}</p></div><select value={draft.status} onChange={e=>setDraft({...draft,status:e.target.value})}><option value="draft">Черновик</option><option value="review">На проверке</option><option value="ready">Согласовано</option><option value="published">Опубликовано</option></select></div><div className="publication-tabs">{["Предпросмотр","Материалы","Согласование"].map(x=><button className={tab===x?"active":""} onClick={()=>setTab(x)}>{x}</button>)}</div>{tab==="Предпросмотр"&&<div className="social-preview"><div className="social-bar"><b>{model?.handle||model?.name}</b><span>•••</span></div><div className="visual-stage">{draft.asset_url?<img src={draft.asset_url}/>:<div><b>Визуал ещё не прикреплён</b><span>Добавь ссылку во вкладке «Материалы»</span></div>}</div><p>{draft.caption}</p></div>}{tab==="Материалы"&&<div className="form"><label>Ссылка на готовое изображение<input value={draft.asset_url||""} onChange={e=>setDraft({...draft,asset_url:e.target.value})} placeholder="https://..."/></label><label>Текст публикации<textarea value={draft.caption||""} onChange={e=>setDraft({...draft,caption:e.target.value})}/></label><label>Визуальный промпт<textarea value={draft.visual_prompt||""} onChange={e=>setDraft({...draft,visual_prompt:e.target.value})}/></label><label>Дата публикации<input type="datetime-local" onChange={e=>setDraft({...draft,publish_at:e.target.value?new Date(e.target.value).toISOString():null})}/></label></div>}{tab==="Согласование"&&<div className="approval"><div className="approval-state"><b>{draft.status==="ready"?"✓ Материал согласован":"Материал ожидает решения"}</b><p>Оставь комментарий для команды или измени статус публикации.</p></div><label>Комментарий редактора<textarea value={draft.review_comment||""} onChange={e=>setDraft({...draft,review_comment:e.target.value})} placeholder="Что изменить или проверить?"/></label><div className="approval-buttons"><button onClick={()=>setDraft({...draft,status:"review"})}>Вернуть на проверку</button><button onClick={()=>setDraft({...draft,status:"ready"})}>✓ Согласовать</button></div></div>}<button className="save-publication" onClick={()=>save(draft)}>Сохранить изменения</button></Modal>
+function PublicationDialog({
+  item,
+  model,
+  close,
+  save,
+}: {
+  item: Item;
+  model?: Model;
+  close: () => void;
+  save: (x: Partial<Item>) => void;
+}) {
+  const [draft, setDraft] = useState<Partial<Item>>(item),
+    [tab, setTab] = useState("Предпросмотр");
+  return (
+    <Modal close={close}>
+      <div className="publication-head">
+        <div>
+          <small>
+            {draft.platform} · {draft.format}
+          </small>
+          <h2>{draft.title}</h2>
+          <p>{model?.name || "Без модели"}</p>
+        </div>
+        <select
+          value={draft.status}
+          onChange={(e) => setDraft({ ...draft, status: e.target.value })}
+        >
+          <option value="draft">Черновик</option>
+          <option value="review">На проверке</option>
+          <option value="ready">Согласовано</option>
+          <option value="published">Опубликовано</option>
+        </select>
+      </div>
+      <div className="publication-tabs">
+        {["Предпросмотр", "Материалы", "Согласование"].map((x) => (
+          <button
+            className={tab === x ? "active" : ""}
+            onClick={() => setTab(x)}
+          >
+            {x}
+          </button>
+        ))}
+      </div>
+      {tab === "Предпросмотр" && (
+        <div className="social-preview">
+          <div className="social-bar">
+            <b>{model?.handle || model?.name}</b>
+            <span>•••</span>
+          </div>
+          <div className="visual-stage">
+            {draft.asset_url ? (
+              <img src={draft.asset_url} />
+            ) : (
+              <div>
+                <b>Визуал ещё не прикреплён</b>
+                <span>Добавь ссылку во вкладке «Материалы»</span>
+              </div>
+            )}
+          </div>
+          <p>{draft.caption}</p>
+        </div>
+      )}
+      {tab === "Материалы" && (
+        <div className="form">
+          <label>
+            Ссылка на готовое изображение
+            <input
+              value={draft.asset_url || ""}
+              onChange={(e) =>
+                setDraft({ ...draft, asset_url: e.target.value })
+              }
+              placeholder="https://..."
+            />
+          </label>
+          <label>
+            Текст публикации
+            <textarea
+              value={draft.caption || ""}
+              onChange={(e) => setDraft({ ...draft, caption: e.target.value })}
+            />
+          </label>
+          <label>
+            Визуальный промпт
+            <textarea
+              value={draft.visual_prompt || ""}
+              onChange={(e) =>
+                setDraft({ ...draft, visual_prompt: e.target.value })
+              }
+            />
+          </label>
+          <label>
+            Дата публикации
+            <input
+              type="datetime-local"
+              onChange={(e) =>
+                setDraft({
+                  ...draft,
+                  publish_at: e.target.value
+                    ? new Date(e.target.value).toISOString()
+                    : null,
+                })
+              }
+            />
+          </label>
+        </div>
+      )}
+      {tab === "Согласование" && (
+        <div className="approval">
+          <div className="approval-state">
+            <b>
+              {draft.status === "ready"
+                ? "✓ Материал согласован"
+                : "Материал ожидает решения"}
+            </b>
+            <p>Оставь комментарий для команды или измени статус публикации.</p>
+          </div>
+          <label>
+            Комментарий редактора
+            <textarea
+              value={draft.review_comment || ""}
+              onChange={(e) =>
+                setDraft({ ...draft, review_comment: e.target.value })
+              }
+              placeholder="Что изменить или проверить?"
+            />
+          </label>
+          <div className="approval-buttons">
+            <button onClick={() => setDraft({ ...draft, status: "review" })}>
+              Вернуть на проверку
+            </button>
+            <button onClick={() => setDraft({ ...draft, status: "ready" })}>
+              ✓ Согласовать
+            </button>
+          </div>
+        </div>
+      )}
+      <button className="save-publication" onClick={() => save(draft)}>
+        Сохранить изменения
+      </button>
+    </Modal>
+  );
 }
 function Modal({
   children,
