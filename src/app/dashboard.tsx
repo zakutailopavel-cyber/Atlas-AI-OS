@@ -24,6 +24,8 @@ type Item = {
   shot_list: string[] | null;
   publish_at: string | null;
   created_by: string;
+  asset_url?: string | null;
+  review_comment?: string | null;
 };
 const menu = [
   "Главная",
@@ -42,6 +44,7 @@ export default function Dashboard({ user }: { user: User }) {
     [loading, setLoading] = useState(true),
     [modelOpen, setModelOpen] = useState<Model | null | undefined>(),
     [contentOpen, setContentOpen] = useState(false);
+  const [selectedItem, setSelectedItem] = useState<Item | null>(null);
   async function load() {
     setLoading(true);
     const [m, c, t] = await Promise.all([
@@ -84,6 +87,22 @@ export default function Dashboard({ user }: { user: User }) {
   }
   async function status(item: Item, next: string) {
     await s.from("content_items").update({ status: next }).eq("id", item.id);
+    load();
+  }
+  async function updateItem(item: Partial<Item>) {
+    await s
+      .from("content_items")
+      .update({
+        title: item.title,
+        caption: item.caption,
+        visual_prompt: item.visual_prompt,
+        status: item.status,
+        publish_at: item.publish_at,
+        asset_url: item.asset_url,
+        review_comment: item.review_comment,
+      })
+      .eq("id", item.id);
+    setSelectedItem(null);
     load();
   }
   return (
@@ -142,6 +161,7 @@ export default function Dashboard({ user }: { user: User }) {
               models={models}
               add={() => setContentOpen(true)}
               status={status}
+              open={setSelectedItem}
             />
           )}{" "}
           {page === "Календарь" && <Calendar items={items} />}{" "}
@@ -161,6 +181,14 @@ export default function Dashboard({ user }: { user: User }) {
           models={models}
           close={() => setContentOpen(false)}
           save={saveItem}
+        />
+      )}
+      {selectedItem && (
+        <PublicationDialog
+          item={selectedItem}
+          model={models.find((m) => m.id === selectedItem.model_id)}
+          close={() => setSelectedItem(null)}
+          save={updateItem}
         />
       )}
     </div>
@@ -246,11 +274,13 @@ function Studio({
   models,
   add,
   status,
+  open,
 }: {
   items: Item[];
   models: Model[];
   add: () => void;
   status: (i: Item, s: string) => void;
+  open: (i: Item) => void;
 }) {
   return (
     <>
@@ -263,7 +293,7 @@ function Studio({
         <button onClick={add}>✦ Создать контент</button>
       </div>
       {items.length ? (
-        <ContentList items={items} models={models} status={status} />
+        <ContentList items={items} models={models} status={status} open={open} />
       ) : (
         <Empty text="Контент-план пока пуст" action={add} />
       )}
@@ -274,15 +304,17 @@ function ContentList({
   items,
   models,
   status,
+  open,
 }: {
   items: Item[];
   models: Model[];
   status?: (i: Item, s: string) => void;
+  open?: (i: Item) => void;
 }) {
   return (
     <div className="list">
       {items.map((x) => (
-        <article>
+        <article onClick={() => open?.(x)}>
           <i>{x.format?.includes("Reel") ? "▶" : "▧"}</i>
           <div>
             <b>{x.title}</b>
@@ -300,6 +332,7 @@ function ContentList({
           {status ? (
             <select
               value={x.status}
+              onClick={(e) => e.stopPropagation()}
               onChange={(e) => status(x, e.target.value)}
             >
               <option value="draft">Черновик</option>
@@ -662,6 +695,10 @@ function ContentDialog({
       </div>
     </Modal>
   );
+}
+function PublicationDialog({item,model,close,save}:{item:Item;model?:Model;close:()=>void;save:(x:Partial<Item>)=>void}){
+  const [draft,setDraft]=useState<Partial<Item>>(item),[tab,setTab]=useState("Предпросмотр");
+  return <Modal close={close}><div className="publication-head"><div><small>{draft.platform} · {draft.format}</small><h2>{draft.title}</h2><p>{model?.name||"Без модели"}</p></div><select value={draft.status} onChange={e=>setDraft({...draft,status:e.target.value})}><option value="draft">Черновик</option><option value="review">На проверке</option><option value="ready">Согласовано</option><option value="published">Опубликовано</option></select></div><div className="publication-tabs">{["Предпросмотр","Материалы","Согласование"].map(x=><button className={tab===x?"active":""} onClick={()=>setTab(x)}>{x}</button>)}</div>{tab==="Предпросмотр"&&<div className="social-preview"><div className="social-bar"><b>{model?.handle||model?.name}</b><span>•••</span></div><div className="visual-stage">{draft.asset_url?<img src={draft.asset_url}/>:<div><b>Визуал ещё не прикреплён</b><span>Добавь ссылку во вкладке «Материалы»</span></div>}</div><p>{draft.caption}</p></div>}{tab==="Материалы"&&<div className="form"><label>Ссылка на готовое изображение<input value={draft.asset_url||""} onChange={e=>setDraft({...draft,asset_url:e.target.value})} placeholder="https://..."/></label><label>Текст публикации<textarea value={draft.caption||""} onChange={e=>setDraft({...draft,caption:e.target.value})}/></label><label>Визуальный промпт<textarea value={draft.visual_prompt||""} onChange={e=>setDraft({...draft,visual_prompt:e.target.value})}/></label><label>Дата публикации<input type="datetime-local" onChange={e=>setDraft({...draft,publish_at:e.target.value?new Date(e.target.value).toISOString():null})}/></label></div>}{tab==="Согласование"&&<div className="approval"><div className="approval-state"><b>{draft.status==="ready"?"✓ Материал согласован":"Материал ожидает решения"}</b><p>Оставь комментарий для команды или измени статус публикации.</p></div><label>Комментарий редактора<textarea value={draft.review_comment||""} onChange={e=>setDraft({...draft,review_comment:e.target.value})} placeholder="Что изменить или проверить?"/></label><div className="approval-buttons"><button onClick={()=>setDraft({...draft,status:"review"})}>Вернуть на проверку</button><button onClick={()=>setDraft({...draft,status:"ready"})}>✓ Согласовать</button></div></div>}<button className="save-publication" onClick={()=>save(draft)}>Сохранить изменения</button></Modal>
 }
 function Modal({
   children,
