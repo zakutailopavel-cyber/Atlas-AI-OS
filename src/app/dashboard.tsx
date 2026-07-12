@@ -28,6 +28,7 @@ type Item = {
   review_comment?: string | null;
 };
 type AvatarJob = { id:string; model_id:string; kind:"avatar"|"scene"; prompt:string; style:string; status:string; output_urls:string[] | null; error:string | null; created_at:string };
+type Asset = {id:string;model_id:string;storage_path:string;kind:string;generation_job_id:string|null;created_at:string};
 const menu = [
   "Главная",
   "AI-модели",
@@ -41,6 +42,7 @@ export default function Dashboard({ user }: { user: User }) {
     [page, setPage] = useState("Главная"),
     [models, setModels] = useState<Model[]>([]),
     [items, setItems] = useState<Item[]>([]),
+    [assets,setAssets]=useState<Asset[]>([]),
     [team, setTeam] = useState<{ email: string; role: string }[]>([]),
     [loading, setLoading] = useState(true),
     [modelOpen, setModelOpen] = useState<Model | null | undefined>(),
@@ -50,17 +52,19 @@ export default function Dashboard({ user }: { user: User }) {
   const [selectedItem, setSelectedItem] = useState<Item | null>(null);
   async function load() {
     setLoading(true);
-    const [m, c, t] = await Promise.all([
+    const [m, c, t, a] = await Promise.all([
       s.from("ai_models").select("*").order("created_at"),
       s
         .from("content_items")
         .select("*")
         .order("created_at", { ascending: false }),
       s.from("profiles").select("email,role").order("created_at"),
+      s.from("model_references").select("*").order("created_at",{ascending:false}),
     ]);
     setModels(m.data || []);
     setItems(c.data || []);
     setTeam(t.data || []);
+    setAssets(a.data||[]);
     setLoading(false);
   }
   useEffect(() => {
@@ -199,7 +203,7 @@ export default function Dashboard({ user }: { user: User }) {
           save={saveItem}
         />
       )}
-      {avatarOpen && <AvatarStudio models={models} close={()=>setAvatarOpen(false)} savePortrait={async(model,url)=>{const passport={...(model.visual_passport||{}),avatar:url};await s.from("ai_models").update({visual_passport:passport}).eq("id",model.id);await s.from("model_references").update({kind:"reference"}).eq("model_id",model.id).eq("kind","primary");await s.from("model_references").insert({model_id:model.id,storage_path:url,kind:"primary",created_by:user.id});await load();}} />}
+      {avatarOpen && <AvatarStudio models={models} items={items} assets={assets} close={()=>setAvatarOpen(false)} savePortrait={async(model,url)=>{const passport={...(model.visual_passport||{}),avatar:url};await s.from("ai_models").update({visual_passport:passport}).eq("id",model.id);await s.from("model_references").update({kind:"reference"}).eq("model_id",model.id).eq("kind","primary");await s.from("model_references").insert({model_id:model.id,storage_path:url,kind:"primary",created_by:user.id});await load();}} saveAsset={async(model,url,jobId)=>{if(!assets.some(a=>a.storage_path===url))await s.from("model_references").insert({model_id:model.id,storage_path:url,kind:"reference",generation_job_id:jobId,created_by:user.id});await load();}} attach={async(itemId,url)=>{await s.from("content_items").update({asset_url:url}).eq("id",itemId);await load();}} />}
       {selectedItem && (
         <PublicationDialog
           item={selectedItem}
@@ -294,8 +298,8 @@ function Models({
     </>
   );
 }
-function AvatarStudio({models,close,savePortrait}:{models:Model[];close:()=>void;savePortrait:(model:Model,url:string)=>Promise<void>}){
-  const [modelId,setModelId]=useState(models[0]?.id||""),[kind,setKind]=useState<"avatar"|"scene">("avatar"),[prompt,setPrompt]=useState(""),[style,setStyle]=useState("Фотореалистичный lifestyle"),[jobs,setJobs]=useState<AvatarJob[]>([]),[busy,setBusy]=useState(false),[error,setError]=useState("");
+function AvatarStudio({models,items,assets,close,savePortrait,saveAsset,attach}:{models:Model[];items:Item[];assets:Asset[];close:()=>void;savePortrait:(model:Model,url:string)=>Promise<void>;saveAsset:(model:Model,url:string,jobId:string)=>Promise<void>;attach:(itemId:string,url:string)=>Promise<void>}){
+  const [modelId,setModelId]=useState(models[0]?.id||""),[kind,setKind]=useState<"avatar"|"scene">("avatar"),[prompt,setPrompt]=useState(""),[style,setStyle]=useState("Фотореалистичный lifestyle"),[jobs,setJobs]=useState<AvatarJob[]>([]),[targetId,setTargetId]=useState(""),[busy,setBusy]=useState(false),[error,setError]=useState("");
   const model=models.find(m=>m.id===modelId);
   async function refresh(){const r=await fetch("/api/avatar");if(r.ok){const d=await r.json();setJobs(d.jobs||[])}}
   useEffect(()=>{refresh();const timer=setInterval(refresh,5000);return()=>clearInterval(timer)},[]);
@@ -304,7 +308,7 @@ function AvatarStudio({models,close,savePortrait}:{models:Model[];close:()=>void
   const ownJobs=jobs.filter(j=>j.model_id===modelId);
   return <Modal close={close}><small>ATLAS AVATAR LAB</small><h2>Студия персонажа</h2><div className="avatar-tabs"><button className={kind==="avatar"?"active":""} onClick={()=>setKind("avatar")}>Создать лицо</button><button className={kind==="scene"?"active":""} onClick={()=>setKind("scene")} disabled={!model?.visual_passport?.avatar}>Создать сцену</button></div><p className="avatar-intro">{kind==="avatar"?"Создай четыре варианта лица и выбери эталон.":"Atlas использует выбранное лицо как референс для новой сцены."}</p>
     <div className="avatar-layout"><div className="form avatar-controls"><label>AI-модель<select value={modelId} onChange={e=>setModelId(e.target.value)}>{models.map(m=><option value={m.id}>{m.name}</option>)}</select></label>{kind==="scene"&&model?.visual_passport?.avatar&&<div className="reference-face"><img src={model.visual_passport.avatar}/><span><b>Лицо зафиксировано</b>Этот портрет будет референсом</span></div>}<label>{kind==="avatar"?"Как должен выглядеть персонаж":"Опиши сцену, одежду и действие"}<textarea value={prompt} onChange={e=>setPrompt(e.target.value)} placeholder={kind==="avatar"?"Возраст, черты лица, волосы, кожа…":"Например: утро у окна, белая рубашка, наносит сыворотку…"} /></label><label>Стиль<select value={style} onChange={e=>setStyle(e.target.value)}><option>Фотореалистичный lifestyle</option><option>Editorial fashion</option><option>Чистый студийный портрет</option><option>Кинематографический кадр</option></select></label><div className="avatar-memory"><b>Память персонажа будет применена</b><span>{model?.visual_passport?.appearance||"Добавь описание внешности в паспорте модели."}</span></div><button onClick={generate} disabled={busy||!prompt||!model}>{busy?"Отправляем в облако…":kind==="avatar"?"✦ Создать 4 варианта":"✦ Создать 4 сцены"}</button>{error&&<strong className="generation-error">{error}</strong>}</div>
-    <div className="avatar-results">{!ownJobs.length?<div className="avatar-placeholder"><i>✦</i><b>Здесь появятся варианты</b><span>Результаты обновятся автоматически.</span></div>:ownJobs.slice(0,4).map(job=><section><header><span>{job.kind==="scene"?"Сцена · ":"Лицо · "}{job.status==="completed"?"Готово":job.status==="failed"?"Ошибка":job.status==="processing"?"Создаём…":"В очереди"}</span><div><time>{new Date(job.created_at).toLocaleString("ru-RU")}</time><button className="job-delete" onClick={()=>remove(job.id)}>×</button></div></header>{job.output_urls?.length?<div className="avatar-grid">{job.output_urls.map(url=><button onClick={()=>job.kind==="avatar"&&model&&savePortrait(model,url)}><img src={url}/><span>{job.kind==="avatar"?"Сделать эталоном":"Сохранено в библиотеке"}</span></button>)}</div>:<div className="job-progress"><i/><p>{job.error||"Задание принято. Результаты обновятся автоматически."}</p></div>}</section>)}</div></div>
+    <div className="avatar-results">{kind==="scene"&&<div className="attach-bar"><label>Прикрепить выбранную сцену к публикации<select value={targetId} onChange={e=>setTargetId(e.target.value)}><option value="">Только сохранить в библиотеку</option>{items.filter(i=>i.model_id===modelId).map(i=><option value={i.id}>{i.title}</option>)}</select></label><span>{assets.filter(a=>a.model_id===modelId&&a.kind==="reference").length} материалов в библиотеке</span></div>}{!ownJobs.length?<div className="avatar-placeholder"><i>✦</i><b>Здесь появятся варианты</b><span>Результаты обновятся автоматически.</span></div>:ownJobs.slice(0,4).map(job=><section><header><span>{job.kind==="scene"?"Сцена · ":"Лицо · "}{job.status==="completed"?"Готово":job.status==="failed"?"Ошибка":job.status==="processing"?"Создаём…":"В очереди"}</span><div><time>{new Date(job.created_at).toLocaleString("ru-RU")}</time><button className="job-delete" onClick={()=>remove(job.id)}>×</button></div></header>{job.output_urls?.length?<div className="avatar-grid">{job.output_urls.map(url=><button onClick={async()=>{if(!model)return;if(job.kind==="avatar")await savePortrait(model,url);else{await saveAsset(model,url,job.id);if(targetId)await attach(targetId,url)}}}><img src={url}/><span>{job.kind==="avatar"?"Сделать эталоном":targetId?"Сохранить и прикрепить":"В библиотеку"}</span>{assets.some(a=>a.storage_path===url)&&<b className="saved-badge">✓</b>}</button>)}</div>:<div className="job-progress"><i/><p>{job.error||"Задание принято. Результаты обновятся автоматически."}</p></div>}</section>)}</div></div>
   </Modal>
 }
 function ModelCards({models,edit}:{models:Model[];edit?:(m:Model)=>void}) {
