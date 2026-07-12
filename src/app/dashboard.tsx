@@ -27,6 +27,7 @@ type Item = {
   asset_url?: string | null;
   review_comment?: string | null;
 };
+type AvatarJob = { id:string; model_id:string; prompt:string; style:string; status:string; output_urls:string[] | null; error:string | null; created_at:string };
 const menu = [
   "Главная",
   "AI-модели",
@@ -44,6 +45,7 @@ export default function Dashboard({ user }: { user: User }) {
     [loading, setLoading] = useState(true),
     [modelOpen, setModelOpen] = useState<Model | null | undefined>(),
     [contentOpen, setContentOpen] = useState(false),
+    [avatarOpen, setAvatarOpen] = useState(false),
     [weekOpen, setWeekOpen] = useState(false);
   const [selectedItem, setSelectedItem] = useState<Item | null>(null);
   async function load() {
@@ -165,6 +167,7 @@ export default function Dashboard({ user }: { user: User }) {
               models={models}
               add={() => setModelOpen(null)}
               edit={setModelOpen}
+              avatars={() => setAvatarOpen(true)}
             />
           )}{" "}
           {page === "Контент-студия" && (
@@ -196,6 +199,7 @@ export default function Dashboard({ user }: { user: User }) {
           save={saveItem}
         />
       )}
+      {avatarOpen && <AvatarStudio models={models} close={()=>setAvatarOpen(false)} savePortrait={async(model,url)=>{const passport={...(model.visual_passport||{}),avatar:url};await s.from("ai_models").update({visual_passport:passport}).eq("id",model.id);await load();}} />}
       {selectedItem && (
         <PublicationDialog
           item={selectedItem}
@@ -271,22 +275,36 @@ function Models({
   models,
   add,
   edit,
+  avatars,
 }: {
   models: Model[];
   add: () => void;
   edit: (m: Model) => void;
+  avatars: () => void;
 }) {
   return (
     <>
       <div className="toolbar">
         <p>Создавай постоянные цифровые личности для всех каналов.</p>
-        <button onClick={add}>+ Новая AI-модель</button>
+        <div className="toolbar-actions"><button className="secondary" onClick={avatars}>✦ Студия аватаров</button><button onClick={add}>+ Новая AI-модель</button></div>
       </div>
       {models.length ? <ModelCards models={models} edit={edit} /> : (
         <Empty text="Пока нет AI-моделей" action={add} />
       )}
     </>
   );
+}
+function AvatarStudio({models,close,savePortrait}:{models:Model[];close:()=>void;savePortrait:(model:Model,url:string)=>Promise<void>}){
+  const [modelId,setModelId]=useState(models[0]?.id||""),[prompt,setPrompt]=useState(""),[style,setStyle]=useState("Фотореалистичный lifestyle"),[jobs,setJobs]=useState<AvatarJob[]>([]),[busy,setBusy]=useState(false),[error,setError]=useState("");
+  const model=models.find(m=>m.id===modelId);
+  async function refresh(){const r=await fetch("/api/avatar");if(r.ok){const d=await r.json();setJobs(d.jobs||[])}}
+  useEffect(()=>{refresh();const timer=setInterval(refresh,5000);return()=>clearInterval(timer)},[]);
+  async function generate(){if(!model||!prompt)return;setBusy(true);setError("");try{const r=await fetch("/api/avatar",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({model_id:model.id,prompt,style,count:4})}),d=await r.json();if(!r.ok)throw new Error(d.error||"Не удалось создать задание");await refresh()}catch(e){setError(e instanceof Error?e.message:"Ошибка генерации")}finally{setBusy(false)}}
+  const ownJobs=jobs.filter(j=>j.model_id===modelId);
+  return <Modal close={close}><small>ATLAS AVATAR LAB</small><h2>Студия аватаров</h2><p className="avatar-intro">Создай четыре варианта лица, выбери эталон — и Atlas запомнит его для будущих сцен.</p>
+    <div className="avatar-layout"><div className="form avatar-controls"><label>AI-модель<select value={modelId} onChange={e=>setModelId(e.target.value)}>{models.map(m=><option value={m.id}>{m.name}</option>)}</select></label><label>Как должен выглядеть персонаж<textarea value={prompt} onChange={e=>setPrompt(e.target.value)} placeholder="Например: 27 лет, тёмные волосы, выразительные карие глаза, естественная кожа…" /></label><label>Стиль<select value={style} onChange={e=>setStyle(e.target.value)}><option>Фотореалистичный lifestyle</option><option>Editorial fashion</option><option>Чистый студийный портрет</option><option>Кинематографический кадр</option></select></label><div className="avatar-memory"><b>Память персонажа будет применена</b><span>{model?.visual_passport?.appearance||"Добавь описание внешности в паспорте модели."}</span></div><button onClick={generate} disabled={busy||!prompt||!model}>{busy?"Отправляем в облако…":"✦ Создать 4 варианта"}</button>{error&&<strong className="generation-error">{error}</strong>}</div>
+    <div className="avatar-results">{!ownJobs.length?<div className="avatar-placeholder"><i>✦</i><b>Здесь появятся варианты</b><span>После подключения Modal обработка происходит автоматически.</span></div>:ownJobs.slice(0,3).map(job=><section><header><span>{job.status==="completed"?"Готово":job.status==="failed"?"Ошибка":job.status==="processing"?"Создаём…":"В очереди"}</span><time>{new Date(job.created_at).toLocaleString("ru-RU")}</time></header>{job.output_urls?.length?<div className="avatar-grid">{job.output_urls.map(url=><button onClick={()=>model&&savePortrait(model,url)}><img src={url}/><span>Сделать эталоном</span></button>)}</div>:<div className="job-progress"><i/><p>{job.error||"Задание принято. Результаты обновятся автоматически."}</p></div>}</section>)}</div></div>
+  </Modal>
 }
 function ModelCards({models,edit}:{models:Model[];edit?:(m:Model)=>void}) {
   return <div className="models">{models.slice(0, edit ? undefined : 3).map((m,i)=><article onClick={()=>edit?.(m)}>
