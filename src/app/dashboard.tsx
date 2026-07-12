@@ -128,7 +128,7 @@ export default function Dashboard({ user }: { user: User }) {
               className={page === n ? "active" : ""}
               onClick={() => setPage(n)}
             >
-              {["⌂", "◉", "✦", "▦", "♙", "⚙"][i]} {n}
+              {["▦", "♙", "✦", "▦", "♙", "⚙"][i]} {n}
             </button>
           ))}
         </nav>
@@ -146,7 +146,11 @@ export default function Dashboard({ user }: { user: User }) {
             <small>РАБОЧЕЕ ПРОСТРАНСТВО ATLAS</small>
             <h1>{page}</h1>
           </div>
-          <span>● {loading ? "Синхронизация…" : "Все данные сохранены"}</span>
+          <div className="header-actions">
+            <label className="search">⌕ <input placeholder="Поиск…" /><kbd>⌘ K</kbd></label>
+            <button className="bell" aria-label="Уведомления">♧<i /></button>
+            <button className="global-create" onClick={() => setContentOpen(true)}>＋ Создать</button>
+          </div>
         </header>
         <div className="content">
           {page === "Главная" && (
@@ -220,26 +224,30 @@ function Home({
   items: Item[];
   create: () => void;
 }) {
+  const ready = items.filter((x) => x.status === "ready" || x.status === "published").length;
+  const scheduled = [...items]
+    .filter((x) => x.publish_at && new Date(x.publish_at).getTime() >= Date.now())
+    .sort((a, b) => String(a.publish_at).localeCompare(String(b.publish_at)))[0];
+  const scheduledModel = models.find((m) => m.id === scheduled?.model_id);
   return (
     <>
       <section className="hero">
-        <small>ТВОЯ КОНТЕНТ-ФАБРИКА</small>
-        <h2>
-          Творческая вселенная
-          <br />
-          <em>работает вместе.</em>
-        </h2>
-        <p>
-          Модели, идеи и публикации доступны команде в одном закрытом
-          пространстве.
-        </p>
-        <button onClick={create}>✦ Создать контент</button>
+        <div className="hero-copy">
+          <small>✦ {new Date().toLocaleDateString("ru-RU", { weekday: "long", day: "numeric", month: "long" }).toUpperCase()}</small>
+          <h2>Твоя творческая вселенная<br /><em>растёт.</em></h2>
+          <p>{models.length ? `${models.length} цифровых автора создают свои истории.` : "Создай первого цифрового автора."}<br />Вот что требует твоего внимания сегодня.</p>
+          <button onClick={create}>✣ Создать контент</button>
+        </div>
+        <div className="hero-orbit" aria-hidden="true">
+          {models.slice(0, 3).map((m, i) => <div className={`orbit-avatar orbit-${i}`} style={m.visual_passport?.avatar ? {backgroundImage:`url(${m.visual_passport.avatar})`} : undefined}>{!m.visual_passport?.avatar && m.name.slice(0,1)}</div>)}
+          <div className="orbit-core">✦</div>
+        </div>
       </section>
       <div className="stats">
         {[
           ["AI-МОДЕЛИ", models.length],
           ["КОНТЕНТ", items.length],
-          ["ГОТОВО", items.filter((x) => x.status === "ready").length],
+          ["ГОТОВО", ready],
           ["ЗАПЛАНИРОВАНО", items.filter((x) => x.publish_at).length],
         ].map((x) => (
           <article>
@@ -249,8 +257,13 @@ function Home({
           </article>
         ))}
       </div>
-      <h2>Последние публикации</h2>
-      <ContentList items={items.slice(0, 5)} models={models} />
+      <div className="section-heading"><div><small>ТВОИ ЦИФРОВЫЕ АВТОРЫ</small><h2>AI-модели</h2></div><span>Показать все ›</span></div>
+      <ModelCards models={models} />
+      <div className="section-heading queue-heading"><div><small>ЛИНИЯ ПРОИЗВОДСТВА</small><h2>Очередь на сегодня</h2></div><span>Открыть календарь ›</span></div>
+      {scheduled ? <section className="today-queue">
+        <div><small>◷ СЛЕДУЮЩАЯ ПУБЛИКАЦИЯ · {new Date(scheduled.publish_at!).toLocaleTimeString("ru-RU",{hour:"2-digit",minute:"2-digit"})}</small><h3>{scheduled.title}</h3><p>{scheduledModel?.name || "Без модели"} · {scheduled.format || scheduled.platform}</p><button>▶ Предпросмотр</button></div>
+        <ul><li>Текст подготовлен <b>{scheduled.caption ? "Готово" : "Нужно заполнить"}</b></li><li>Визуал прикреплён <b>{scheduled.asset_url ? "Готово" : "Проверить"}</b></li><li>Статус публикации <b>{scheduled.status === "ready" ? "Готово" : "В работе"}</b></li></ul>
+      </section> : <Empty text="Запланируй публикацию — она появится здесь" action={create} />}
     </>
   );
 }
@@ -269,22 +282,21 @@ function Models({
         <p>Создавай постоянные цифровые личности для всех каналов.</p>
         <button onClick={add}>+ Новая AI-модель</button>
       </div>
-      {models.length ? (
-        <div className="models">
-          {models.map((m, i) => (
-            <article onClick={() => edit(m)}>
-              <div className={"portrait p" + (i % 3)} />
-              <h3>{m.name}</h3>
-              <p>{m.niche || "Ниша не указана"}</p>
-              <small>{m.status}</small>
-            </article>
-          ))}
-        </div>
-      ) : (
+      {models.length ? <ModelCards models={models} edit={edit} /> : (
         <Empty text="Пока нет AI-моделей" action={add} />
       )}
     </>
   );
+}
+function ModelCards({models,edit}:{models:Model[];edit?:(m:Model)=>void}) {
+  return <div className="models">{models.slice(0, edit ? undefined : 3).map((m,i)=><article onClick={()=>edit?.(m)}>
+    <div className={`portrait p${i%3}`} style={m.visual_passport?.avatar ? {backgroundImage:`url(${m.visual_passport.avatar})`} : undefined}>
+      <small>{m.status === "active" ? "Активна" : "Черновик"}</small><button onClick={(e)=>e.stopPropagation()}>•••</button>
+    </div>
+    <div className="model-copy"><h3>{m.name}<span>↗</span></h3><label>{m.handle || "Профиль не указан"}</label><p>{m.niche || "Ниша не указана"}</p>
+      <div className="model-metrics"><b>—<small>Подписчики</small></b><b>—<small>Рост за 30 дней</small></b><b>—<small>Публикации</small></b></div>
+    </div>
+  </article>)}</div>
 }
 function Studio({
   items,
@@ -580,6 +592,10 @@ function ModelDialog({
       )}
       {tab === "Внешность" && (
         <div className="form">
+          <label>
+            URL портрета
+            <input value={m.visual_passport?.avatar || ""} onChange={(e)=>setM({...m,visual_passport:{...m.visual_passport,avatar:e.target.value}})} placeholder="https://… (прямая ссылка на изображение)" />
+          </label>
           <label>
             Описание внешности
             <textarea
