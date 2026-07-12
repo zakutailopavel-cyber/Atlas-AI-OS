@@ -39,23 +39,25 @@ class AvatarGenerator:
     @modal.enter()
     def load(self):
         import torch
-        from diffusers import AutoPipelineForText2Image
+        from diffusers import AutoPipelineForText2Image, AutoPipelineForImage2Image
         self.pipe = AutoPipelineForText2Image.from_pretrained(
             "stabilityai/sdxl-turbo", torch_dtype=torch.float16, variant="fp16"
         ).to("cuda")
 
     @modal.method()
     def generate(self, payload: dict):
+        import torch
         db, job_id = database(), payload["job_id"]
         db.table("generation_jobs").update({"status":"processing","started_at":datetime.now(timezone.utc).isoformat()}).eq("id", job_id).execute()
         try:
             request, model = payload["request"], payload["model"]
-            memory = model.get("visual_passport") or {}
-            prompt = (f"professional headshot of one fictional adult character, one person only, solo, "
-                      f"{request['prompt']}, {memory.get('appearance','')}, {memory.get('style','')}, "
-                      f"{request.get('style','')}, photorealistic, natural skin texture, editorial lighting, no text")
-            pictures = [self.pipe(prompt=prompt, num_inference_steps=4, guidance_scale=0.0, height=768, width=768).images[0]
-                        for _ in range(min(int(request.get("count", 4)), 4))]
+            prompt = (f"{request['prompt']}, one person only, centered head and shoulders, symmetrical composition, "
+                      f"{request.get('style','')}, real photograph, natural skin pores, realistic eyes, no text, no drawing")
+            base_seed = int(request.get("seed", 1))
+            pictures = [self.pipe(prompt=prompt, num_inference_steps=4, guidance_scale=0.0,
+                                  generator=torch.Generator(device="cuda").manual_seed(base_seed + index * 9973),
+                                  height=768, width=768).images[0]
+                        for index in range(min(int(request.get("count", 1)), 3))]
             save_results(db, payload, pictures)
         except Exception as error:
             db.table("generation_jobs").update({"status":"failed","error":str(error)[:500],"completed_at":datetime.now(timezone.utc).isoformat()}).eq("id", job_id).execute(); raise
@@ -75,6 +77,8 @@ class SceneGenerator:
             torch_dtype=torch.float16, variant="fp16").to("cuda")
         self.pipe.load_ip_adapter("h94/IP-Adapter", subfolder="sdxl_models", weight_name="ip-adapter-plus-face_sdxl_vit-h.safetensors")
         self.pipe.set_ip_adapter_scale(0.48)
+        self.img2img = AutoPipelineForImage2Image.from_pipe(self.pipe)
+        self.reference_cache = {}
 
     @modal.method()
     def generate(self, payload: dict):
@@ -85,7 +89,10 @@ class SceneGenerator:
         try:
             request, model = payload["request"], payload["model"]
             memory = model.get("visual_passport") or {}
-            reference = Image.open(requests.get(request["reference_url"], timeout=30, stream=True).raw).convert("RGB")
+            reference_url = request["reference_url"]
+            if reference_url not in self.reference_cache:
+                self.reference_cache[reference_url] = Image.open(requests.get(reference_url, timeout=30, stream=True).raw).convert("RGB")
+            reference = self.reference_cache[reference_url]
             prompt = (f"one adult woman only, solo, exactly one person and one face, {request['prompt']}, "
                       f"same fictional character as reference, {memory.get('appearance','')[:140]}, {memory.get('style','')[:80]}, "
                       f"{request.get('style','')}, exact requested action and object, photorealistic editorial photography, "
@@ -93,9 +100,17 @@ class SceneGenerator:
             negative = ("two people, multiple people, duplicate person, twins, extra face, reflected face, extra head, "
                         "extra arms, extra hands, extra fingers, fused body, wrong object, cup, mug, food, text, watermark, "
                         "plastic skin, illustration, low quality, blurry, collage, diptych, triptych, split screen, multiple panels")
-            pictures = [self.pipe(prompt=prompt, negative_prompt=negative, ip_adapter_image=reference,
-                                  num_inference_steps=25, guidance_scale=6.0, height=1024, width=768).images[0]
-                        for _ in range(min(int(request.get("count", 4)), 4))]
+            source_url = request.get("source_url")
+            if source_url:
+                source = Image.open(requests.get(source_url, timeout=30, stream=True).raw).convert("RGB").resize((768, 1024))
+                picture = self.img2img(prompt=prompt, negative_prompt=negative, image=source,
+                                      ip_adapter_image=reference, strength=0.32,
+                                      num_inference_steps=20, guidance_scale=5.5).images[0]
+            else:
+                picture = self.pipe(prompt=prompt, negative_prompt=negative, ip_adapter_image=reference,
+                                    num_inference_steps=25, guidance_scale=6.0,
+                                    height=1024, width=768).images[0]
+            pictures = [picture]
             save_results(db, payload, pictures)
         except Exception as error:
             db.table("generation_jobs").update({"status":"failed","error":str(error)[:500],"completed_at":datetime.now(timezone.utc).isoformat()}).eq("id", job_id).execute(); raise
