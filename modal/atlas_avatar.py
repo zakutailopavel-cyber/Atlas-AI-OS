@@ -46,10 +46,10 @@ class AvatarGenerator:
             request, model = payload["request"], payload["model"]
             memory = model.get("visual_passport") or {}
             is_scene = request.get("kind") == "scene"
-            prefix = "editorial lifestyle photograph of the same fictional adult character" if is_scene else "professional headshot of one fictional adult character"
+            prefix = "editorial lifestyle photograph, one person only, solo, exactly one face, of the same fictional adult character" if is_scene else "professional headshot of one fictional adult character, one person only, solo, exactly one face"
             prompt = (f"{prefix}, {request['prompt']}, {memory.get('appearance','')}, "
                       f"{memory.get('style','')}, {request.get('style','')}, photorealistic, natural skin texture, "
-                      "editorial lighting, consistent facial identity, anatomically correct, no text")
+                      "editorial lighting, consistent facial identity, exact requested action and object, anatomically correct, no other people, no duplicate person, no text")
             reference = None
             if is_scene and request.get("reference_url"):
                 import requests
