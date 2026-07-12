@@ -74,7 +74,7 @@ class SceneGenerator:
             "stabilityai/stable-diffusion-xl-base-1.0", image_encoder=encoder,
             torch_dtype=torch.float16, variant="fp16").to("cuda")
         self.pipe.load_ip_adapter("h94/IP-Adapter", subfolder="sdxl_models", weight_name="ip-adapter-plus-face_sdxl_vit-h.safetensors")
-        self.pipe.set_ip_adapter_scale(0.62)
+        self.pipe.set_ip_adapter_scale(0.48)
 
     @modal.method()
     def generate(self, payload: dict):
@@ -87,12 +87,12 @@ class SceneGenerator:
             memory = model.get("visual_passport") or {}
             reference = Image.open(requests.get(request["reference_url"], timeout=30, stream=True).raw).convert("RGB")
             prompt = (f"one adult woman only, solo, exactly one person and one face, {request['prompt']}, "
-                      f"same fictional character as reference, {memory.get('appearance','')}, {memory.get('style','')}, "
+                      f"same fictional character as reference, {memory.get('appearance','')[:140]}, {memory.get('style','')[:80]}, "
                       f"{request.get('style','')}, exact requested action and object, photorealistic editorial photography, "
                       "natural skin, correct anatomy, two hands, no text")
             negative = ("two people, multiple people, duplicate person, twins, extra face, reflected face, extra head, "
                         "extra arms, extra hands, extra fingers, fused body, wrong object, cup, mug, food, text, watermark, "
-                        "plastic skin, illustration, low quality, blurry")
+                        "plastic skin, illustration, low quality, blurry, collage, diptych, triptych, split screen, multiple panels")
             pictures = [self.pipe(prompt=prompt, negative_prompt=negative, ip_adapter_image=reference,
                                   num_inference_steps=25, guidance_scale=6.0, height=1024, width=768).images[0]
                         for _ in range(min(int(request.get("count", 4)), 4))]
