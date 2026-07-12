@@ -6,6 +6,7 @@ import "./ai.css";
 import "./production.css";
 import "./weekly.css";
 import "./brain.css";
+import "./avatar.css";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
