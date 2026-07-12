@@ -7,16 +7,31 @@ from fastapi import Request, HTTPException
 
 app = modal.App("atlas-avatar-generator")
 
-def download_model():
+def download_models():
     from diffusers import AutoPipelineForText2Image
     from transformers import CLIPVisionModelWithProjection
-    image_encoder = CLIPVisionModelWithProjection.from_pretrained("h94/IP-Adapter", subfolder="models/image_encoder")
-    pipe = AutoPipelineForText2Image.from_pretrained("stabilityai/sdxl-turbo", image_encoder=image_encoder)
-    pipe.load_ip_adapter("h94/IP-Adapter", subfolder="sdxl_models", weight_name="ip-adapter-plus-face_sdxl_vit-h.safetensors")
+    AutoPipelineForText2Image.from_pretrained("stabilityai/sdxl-turbo")
+    encoder = CLIPVisionModelWithProjection.from_pretrained("h94/IP-Adapter", subfolder="models/image_encoder")
+    scene = AutoPipelineForText2Image.from_pretrained("stabilityai/stable-diffusion-xl-base-1.0", image_encoder=encoder)
+    scene.load_ip_adapter("h94/IP-Adapter", subfolder="sdxl_models", weight_name="ip-adapter-plus-face_sdxl_vit-h.safetensors")
 
 image = (modal.Image.debian_slim(python_version="3.11")
     .pip_install("torch", "diffusers", "transformers", "accelerate", "safetensors", "supabase", "pillow", "fastapi", "requests")
-    .run_function(download_model))
+    .run_function(download_models))
+
+def database():
+    from supabase import create_client
+    return create_client(os.environ["SUPABASE_URL"], os.environ["SUPABASE_SERVICE_ROLE_KEY"])
+
+def save_results(db, payload, pictures):
+    job_id, model = payload["job_id"], payload["model"]
+    outputs = []
+    for index, picture in enumerate(pictures):
+        buffer = io.BytesIO(); picture.save(buffer, format="JPEG", quality=93)
+        path = f"avatars/{model['id']}/{job_id}-{index}-{secrets.token_hex(3)}.jpg"
+        db.storage.from_("atlas-assets").upload(path, buffer.getvalue(), {"content-type":"image/jpeg"})
+        outputs.append(db.storage.from_("atlas-assets").get_public_url(path))
+    db.table("generation_jobs").update({"status":"completed","output_urls":outputs,"completed_at":datetime.now(timezone.utc).isoformat()}).eq("id", job_id).execute()
 
 @app.cls(image=image, gpu="A10G", scaledown_window=60, timeout=600,
          secrets=[modal.Secret.from_name("atlas-supabase"), modal.Secret.from_name("atlas-worker")])
@@ -25,49 +40,65 @@ class AvatarGenerator:
     def load(self):
         import torch
         from diffusers import AutoPipelineForText2Image
-        from transformers import CLIPVisionModelWithProjection
-        image_encoder = CLIPVisionModelWithProjection.from_pretrained(
-            "h94/IP-Adapter", subfolder="models/image_encoder", torch_dtype=torch.float16
-        )
         self.pipe = AutoPipelineForText2Image.from_pretrained(
-            "stabilityai/sdxl-turbo", image_encoder=image_encoder, torch_dtype=torch.float16, variant="fp16"
+            "stabilityai/sdxl-turbo", torch_dtype=torch.float16, variant="fp16"
         ).to("cuda")
-        self.pipe.load_ip_adapter("h94/IP-Adapter", subfolder="sdxl_models", weight_name="ip-adapter-plus-face_sdxl_vit-h.safetensors")
-        self.pipe.set_ip_adapter_scale(0.82)
 
     @modal.method()
     def generate(self, payload: dict):
-        from supabase import create_client
-        db = create_client(os.environ["SUPABASE_URL"], os.environ["SUPABASE_SERVICE_ROLE_KEY"])
-        job_id = payload["job_id"]
-        now = lambda: datetime.now(timezone.utc).isoformat()
-        db.table("generation_jobs").update({"status":"processing","started_at":now()}).eq("id", job_id).execute()
+        db, job_id = database(), payload["job_id"]
+        db.table("generation_jobs").update({"status":"processing","started_at":datetime.now(timezone.utc).isoformat()}).eq("id", job_id).execute()
         try:
             request, model = payload["request"], payload["model"]
             memory = model.get("visual_passport") or {}
-            is_scene = request.get("kind") == "scene"
-            prefix = "editorial lifestyle photograph, one person only, solo, exactly one face, of the same fictional adult character" if is_scene else "professional headshot of one fictional adult character, one person only, solo, exactly one face"
-            prompt = (f"{prefix}, {request['prompt']}, {memory.get('appearance','')}, "
-                      f"{memory.get('style','')}, {request.get('style','')}, photorealistic, natural skin texture, "
-                      "editorial lighting, consistent facial identity, exact requested action and object, anatomically correct, no other people, no duplicate person, no text")
-            reference = None
-            if is_scene and request.get("reference_url"):
-                import requests
-                from PIL import Image
-                reference = Image.open(requests.get(request["reference_url"], timeout=30, stream=True).raw).convert("RGB")
-            outputs = []
-            for index in range(min(int(request.get("count", 4)), 4)):
-                args = dict(prompt=prompt, num_inference_steps=4, guidance_scale=0.0, height=768, width=768)
-                if reference is not None: args["ip_adapter_image"] = reference
-                result = self.pipe(**args).images[0]
-                buffer = io.BytesIO(); result.save(buffer, format="JPEG", quality=92)
-                path = f"avatars/{model['id']}/{job_id}-{index}-{secrets.token_hex(3)}.jpg"
-                db.storage.from_("atlas-assets").upload(path, buffer.getvalue(), {"content-type":"image/jpeg"})
-                outputs.append(db.storage.from_("atlas-assets").get_public_url(path))
-            db.table("generation_jobs").update({"status":"completed","output_urls":outputs,"completed_at":now()}).eq("id", job_id).execute()
+            prompt = (f"professional headshot of one fictional adult character, one person only, solo, "
+                      f"{request['prompt']}, {memory.get('appearance','')}, {memory.get('style','')}, "
+                      f"{request.get('style','')}, photorealistic, natural skin texture, editorial lighting, no text")
+            pictures = [self.pipe(prompt=prompt, num_inference_steps=4, guidance_scale=0.0, height=768, width=768).images[0]
+                        for _ in range(min(int(request.get("count", 4)), 4))]
+            save_results(db, payload, pictures)
         except Exception as error:
-            db.table("generation_jobs").update({"status":"failed","error":str(error)[:500],"completed_at":now()}).eq("id", job_id).execute()
-            raise
+            db.table("generation_jobs").update({"status":"failed","error":str(error)[:500],"completed_at":datetime.now(timezone.utc).isoformat()}).eq("id", job_id).execute(); raise
+
+@app.cls(image=image, gpu="A10G", scaledown_window=60, timeout=900,
+         secrets=[modal.Secret.from_name("atlas-supabase"), modal.Secret.from_name("atlas-worker")])
+class SceneGenerator:
+    @modal.enter()
+    def load(self):
+        import torch
+        from diffusers import AutoPipelineForText2Image
+        from transformers import CLIPVisionModelWithProjection
+        encoder = CLIPVisionModelWithProjection.from_pretrained(
+            "h94/IP-Adapter", subfolder="models/image_encoder", torch_dtype=torch.float16)
+        self.pipe = AutoPipelineForText2Image.from_pretrained(
+            "stabilityai/stable-diffusion-xl-base-1.0", image_encoder=encoder,
+            torch_dtype=torch.float16, variant="fp16").to("cuda")
+        self.pipe.load_ip_adapter("h94/IP-Adapter", subfolder="sdxl_models", weight_name="ip-adapter-plus-face_sdxl_vit-h.safetensors")
+        self.pipe.set_ip_adapter_scale(0.62)
+
+    @modal.method()
+    def generate(self, payload: dict):
+        import requests
+        from PIL import Image
+        db, job_id = database(), payload["job_id"]
+        db.table("generation_jobs").update({"status":"processing","started_at":datetime.now(timezone.utc).isoformat()}).eq("id", job_id).execute()
+        try:
+            request, model = payload["request"], payload["model"]
+            memory = model.get("visual_passport") or {}
+            reference = Image.open(requests.get(request["reference_url"], timeout=30, stream=True).raw).convert("RGB")
+            prompt = (f"one adult woman only, solo, exactly one person and one face, {request['prompt']}, "
+                      f"same fictional character as reference, {memory.get('appearance','')}, {memory.get('style','')}, "
+                      f"{request.get('style','')}, exact requested action and object, photorealistic editorial photography, "
+                      "natural skin, correct anatomy, two hands, no text")
+            negative = ("two people, multiple people, duplicate person, twins, extra face, reflected face, extra head, "
+                        "extra arms, extra hands, extra fingers, fused body, wrong object, cup, mug, food, text, watermark, "
+                        "plastic skin, illustration, low quality, blurry")
+            pictures = [self.pipe(prompt=prompt, negative_prompt=negative, ip_adapter_image=reference,
+                                  num_inference_steps=25, guidance_scale=6.0, height=1024, width=768).images[0]
+                        for _ in range(min(int(request.get("count", 4)), 4))]
+            save_results(db, payload, pictures)
+        except Exception as error:
+            db.table("generation_jobs").update({"status":"failed","error":str(error)[:500],"completed_at":datetime.now(timezone.utc).isoformat()}).eq("id", job_id).execute(); raise
 
 @app.function(image=image, secrets=[modal.Secret.from_name("atlas-worker")])
 @modal.fastapi_endpoint(method="POST")
@@ -75,5 +106,6 @@ async def submit(request: Request):
     if request.headers.get("x-atlas-secret") != os.environ["ATLAS_WORKER_SECRET"]:
         raise HTTPException(status_code=401, detail="Unauthorized")
     payload = await request.json()
-    AvatarGenerator().generate.spawn(payload)
+    if payload.get("request", {}).get("kind") == "scene": SceneGenerator().generate.spawn(payload)
+    else: AvatarGenerator().generate.spawn(payload)
     return {"accepted": True}
