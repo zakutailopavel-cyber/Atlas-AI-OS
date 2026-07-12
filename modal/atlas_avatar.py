@@ -9,7 +9,9 @@ app = modal.App("atlas-avatar-generator")
 
 def download_model():
     from diffusers import AutoPipelineForText2Image
-    pipe = AutoPipelineForText2Image.from_pretrained("stabilityai/sdxl-turbo")
+    from transformers import CLIPVisionModelWithProjection
+    image_encoder = CLIPVisionModelWithProjection.from_pretrained("h94/IP-Adapter", subfolder="models/image_encoder")
+    pipe = AutoPipelineForText2Image.from_pretrained("stabilityai/sdxl-turbo", image_encoder=image_encoder)
     pipe.load_ip_adapter("h94/IP-Adapter", subfolder="sdxl_models", weight_name="ip-adapter-plus-face_sdxl_vit-h.safetensors")
 
 image = (modal.Image.debian_slim(python_version="3.11")
@@ -23,8 +25,12 @@ class AvatarGenerator:
     def load(self):
         import torch
         from diffusers import AutoPipelineForText2Image
+        from transformers import CLIPVisionModelWithProjection
+        image_encoder = CLIPVisionModelWithProjection.from_pretrained(
+            "h94/IP-Adapter", subfolder="models/image_encoder", torch_dtype=torch.float16
+        )
         self.pipe = AutoPipelineForText2Image.from_pretrained(
-            "stabilityai/sdxl-turbo", torch_dtype=torch.float16, variant="fp16"
+            "stabilityai/sdxl-turbo", image_encoder=image_encoder, torch_dtype=torch.float16, variant="fp16"
         ).to("cuda")
         self.pipe.load_ip_adapter("h94/IP-Adapter", subfolder="sdxl_models", weight_name="ip-adapter-plus-face_sdxl_vit-h.safetensors")
         self.pipe.set_ip_adapter_scale(0.82)
