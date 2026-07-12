@@ -1,0 +1,11 @@
+create table if not exists public.generation_jobs (id uuid primary key default gen_random_uuid(),model_id uuid not null references public.ai_models(id) on delete cascade,prompt text not null,style text not null default 'photorealistic',count integer not null default 4 check(count between 1 and 4),status text not null default 'queued' check(status in('queued','processing','completed','failed')),output_urls text[],provider text not null default 'modal',provider_job_id text,error text,created_by uuid not null references auth.users(id),created_at timestamptz not null default now(),started_at timestamptz,completed_at timestamptz);
+create table if not exists public.model_references (id uuid primary key default gen_random_uuid(),model_id uuid not null references public.ai_models(id) on delete cascade,storage_path text not null,kind text not null default 'candidate' check(kind in('candidate','primary','reference')),generation_job_id uuid references public.generation_jobs(id) on delete set null,created_by uuid not null references auth.users(id),created_at timestamptz not null default now());
+alter table public.generation_jobs enable row level security;alter table public.model_references enable row level security;
+create policy "team reads generation jobs" on public.generation_jobs for select to authenticated using(true);
+create policy "team creates generation jobs" on public.generation_jobs for insert to authenticated with check(auth.uid()=created_by);
+create policy "team updates own generation jobs" on public.generation_jobs for update to authenticated using(auth.uid()=created_by) with check(auth.uid()=created_by);
+create policy "team reads model references" on public.model_references for select to authenticated using(true);
+create policy "team creates model references" on public.model_references for insert to authenticated with check(auth.uid()=created_by);
+insert into storage.buckets(id,name,public,file_size_limit,allowed_mime_types) values('atlas-assets','atlas-assets',true,10485760,array['image/jpeg','image/png','image/webp']) on conflict(id) do nothing;
+create policy "authenticated reads atlas assets" on storage.objects for select to authenticated using(bucket_id='atlas-assets');
+create policy "service uploads atlas assets" on storage.objects for insert to service_role with check(bucket_id='atlas-assets');
