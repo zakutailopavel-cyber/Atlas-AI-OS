@@ -9,10 +9,11 @@ app = modal.App("atlas-avatar-generator")
 
 def download_model():
     from diffusers import AutoPipelineForText2Image
-    AutoPipelineForText2Image.from_pretrained("stabilityai/sdxl-turbo")
+    pipe = AutoPipelineForText2Image.from_pretrained("stabilityai/sdxl-turbo")
+    pipe.load_ip_adapter("h94/IP-Adapter", subfolder="sdxl_models", weight_name="ip-adapter-plus-face_sdxl_vit-h.safetensors")
 
 image = (modal.Image.debian_slim(python_version="3.11")
-    .pip_install("torch", "diffusers", "transformers", "accelerate", "safetensors", "supabase", "pillow", "fastapi")
+    .pip_install("torch", "diffusers", "transformers", "accelerate", "safetensors", "supabase", "pillow", "fastapi", "requests")
     .run_function(download_model))
 
 @app.cls(image=image, gpu="A10G", scaledown_window=60, timeout=600,
@@ -25,6 +26,8 @@ class AvatarGenerator:
         self.pipe = AutoPipelineForText2Image.from_pretrained(
             "stabilityai/sdxl-turbo", torch_dtype=torch.float16, variant="fp16"
         ).to("cuda")
+        self.pipe.load_ip_adapter("h94/IP-Adapter", subfolder="sdxl_models", weight_name="ip-adapter-plus-face_sdxl_vit-h.safetensors")
+        self.pipe.set_ip_adapter_scale(0.82)
 
     @modal.method()
     def generate(self, payload: dict):
@@ -36,12 +39,21 @@ class AvatarGenerator:
         try:
             request, model = payload["request"], payload["model"]
             memory = model.get("visual_passport") or {}
-            prompt = (f"professional headshot of one fictional adult character, {request['prompt']}, "
-                      f"{memory.get('appearance','')}, {memory.get('style','')}, {request.get('style','')}, "
-                      "photorealistic, natural skin texture, editorial lighting, consistent facial identity, no text")
+            is_scene = request.get("kind") == "scene"
+            prefix = "editorial lifestyle photograph of the same fictional adult character" if is_scene else "professional headshot of one fictional adult character"
+            prompt = (f"{prefix}, {request['prompt']}, {memory.get('appearance','')}, "
+                      f"{memory.get('style','')}, {request.get('style','')}, photorealistic, natural skin texture, "
+                      "editorial lighting, consistent facial identity, anatomically correct, no text")
+            reference = None
+            if is_scene and request.get("reference_url"):
+                import requests
+                from PIL import Image
+                reference = Image.open(requests.get(request["reference_url"], timeout=30, stream=True).raw).convert("RGB")
             outputs = []
             for index in range(min(int(request.get("count", 4)), 4)):
-                result = self.pipe(prompt=prompt, num_inference_steps=4, guidance_scale=0.0, height=768, width=768).images[0]
+                args = dict(prompt=prompt, num_inference_steps=4, guidance_scale=0.0, height=768, width=768)
+                if reference is not None: args["ip_adapter_image"] = reference
+                result = self.pipe(**args).images[0]
                 buffer = io.BytesIO(); result.save(buffer, format="JPEG", quality=92)
                 path = f"avatars/{model['id']}/{job_id}-{index}-{secrets.token_hex(3)}.jpg"
                 db.storage.from_("atlas-assets").upload(path, buffer.getvalue(), {"content-type":"image/jpeg"})
