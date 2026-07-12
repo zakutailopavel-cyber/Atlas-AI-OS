@@ -3,6 +3,7 @@ import os
 import secrets
 from datetime import datetime, timezone
 import modal
+from fastapi import Request, HTTPException
 
 app = modal.App("atlas-avatar-generator")
 
@@ -52,10 +53,9 @@ class AvatarGenerator:
 
 @app.function(image=image, secrets=[modal.Secret.from_name("atlas-worker")])
 @modal.fastapi_endpoint(method="POST")
-async def submit(request):
+async def submit(request: Request):
     if request.headers.get("x-atlas-secret") != os.environ["ATLAS_WORKER_SECRET"]:
-        from fastapi import HTTPException
         raise HTTPException(status_code=401, detail="Unauthorized")
     payload = await request.json()
-    call = AvatarGenerator().generate.spawn(payload)
-    return {"accepted": True, "modal_call_id": call.object_id}
+    AvatarGenerator().generate.spawn(payload)
+    return {"accepted": True}
