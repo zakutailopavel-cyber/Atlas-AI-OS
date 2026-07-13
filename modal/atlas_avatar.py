@@ -52,7 +52,7 @@ class AvatarGenerator:
         db.table("generation_jobs").update({"status":"processing","started_at":datetime.now(timezone.utc).isoformat()}).eq("id", job_id).execute()
         try:
             request, model = payload["request"], payload["model"]
-            age_match = re.search(r"\\b(\\d{2})-year-old\\b", request["prompt"], re.IGNORECASE)
+            age_match = re.search(r"\b(\d{2})-year-old\b", request["prompt"], re.IGNORECASE)
             age = int(age_match.group(1)) if age_match else 30
             if age <= 30:
                 age_anchor = f"exactly {age} years old, unmistakably a young adult woman in her twenties, youthful full cheeks, smooth firm forehead"
@@ -63,7 +63,8 @@ class AvatarGenerator:
             prompt = (f"{age_anchor}, {request['prompt']}, single contemporary full-color portrait, one woman, one face, "
                       "frontal head-and-shoulders, warm natural light, neutral beige background, "
                       "realistic skin texture, subtle facial asymmetry, professional 85mm lens")
-            negative = ("middle-aged, mature woman, older woman, elderly, aged face, forehead wrinkles, crow feet, under-eye bags, "\n                        "deep nasolabial folds, hollow cheeks, sagging skin, gray hair, generic instagram model, same face, lookalike, "
+            negative = ("middle-aged, mature woman, older woman, elderly, aged face, forehead wrinkles, crow feet, under-eye bags, "
+                        "deep nasolabial folds, hollow cheeks, sagging skin, gray hair, generic instagram model, same face, lookalike, "
                         "plastic skin, doll face, illustration, anime, painting, 3d render, extra person, extra face, profile view, "
                         "contact sheet, casting sheet, character sheet, photo grid, collage, multiple views, multiple panels, "
                         "sequence, comparison, labels, numbers, symbols, text, watermark, black and white, monochrome, grayscale, "
