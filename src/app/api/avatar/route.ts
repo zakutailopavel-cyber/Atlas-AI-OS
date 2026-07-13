@@ -27,8 +27,8 @@ const DISTINCTIVE_DETAILS=[
   "light freckles across the nose and a subtle cleft chin",
   "one eyebrow sits slightly higher and the nose has a tiny natural bump",
   "a small beauty mark on the right cheek and a softly asymmetric smile",
-  "subtle under-eye creases and a tiny scar through the left eyebrow",
-  "a defined cupid's bow and natural smile lines around the mouth",
+  "a tiny scar through the left eyebrow and slightly uneven eyebrow arches",
+  "a defined cupid's bow and a subtly fuller lower lip",
 ];
 function hash(value:string){return Array.from(value).reduce((result,char)=>(result*31+char.charCodeAt(0))>>>0,2166136261)}
 function identityBlueprint(modelId:string){const value=hash(modelId);return `${FACE_BLUEPRINTS[value%FACE_BLUEPRINTS.length]}, ${DISTINCTIVE_DETAILS[(value>>>8)%DISTINCTIVE_DETAILS.length]}`}
@@ -37,7 +37,7 @@ async function optimizeAvatarPrompt(source:string,appearance:string,blueprint:st
   if(!process.env.OPENAI_API_KEY)return `${source}. ${appearance}. Identity geometry: ${blueprint}`.slice(0,750);
   try{
     const openai=new OpenAI({apiKey:process.env.OPENAI_API_KEY});
-    const response=await openai.responses.create({model:"gpt-5.4-mini",reasoning:{effort:"low"},store:false,max_output_tokens:180,instructions:"Turn the character profile into one concise English SDXL prompt, maximum 70 words, for a premium contemporary COLOR lifestyle portrait. Use the PROFILE as the source of truth; OPTIONAL ADJUSTMENTS may only refine it. The mandatory Identity geometry must make this person visibly distinct while remaining attractive and believable. Preserve explicit age, ancestry, face shape, eye color, nose, lips, hair, skin texture, freckles, moles and asymmetry. If age is absent, use 30. Exactly ONE fictional woman, ONE face, ONE frontal head-and-shoulders photo, warm neutral studio. No generic Instagram face, contact sheet, grid, labels or numbers. Return only the prompt.",input:`PROFILE: ${appearance}\nMANDATORY DISTINCT IDENTITY: ${blueprint}\nOPTIONAL ADJUSTMENTS: ${source||"none"}`});
+    const response=await openai.responses.create({model:"gpt-5.4-mini",reasoning:{effort:"low"},store:false,max_output_tokens:120,instructions:"Return one compact English SDXL prompt of at most 42 words. START with the exact age, then ancestry, face geometry, eyes, nose, lips, hair and skin. Use PROFILE as truth and include MANDATORY IDENTITY. Optional adjustments only refine it. One fictional woman, one face, frontal color portrait. No age-changing details, grids, labels or commentary.",input:`PROFILE: ${appearance}\nMANDATORY IDENTITY: ${blueprint}\nOPTIONAL ADJUSTMENTS: ${source||"none"}`});
     return response.output_text?.trim()||source;
   }catch{return `${source}. ${appearance}`.slice(0,650)}
 }
