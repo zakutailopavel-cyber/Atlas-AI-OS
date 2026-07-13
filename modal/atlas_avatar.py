@@ -10,7 +10,7 @@ app = modal.App("atlas-avatar-generator")
 def download_models():
     from diffusers import AutoPipelineForText2Image
     from transformers import CLIPVisionModelWithProjection
-    AutoPipelineForText2Image.from_pretrained("stabilityai/stable-diffusion-xl-base-1.0")
+    AutoPipelineForText2Image.from_pretrained("SG161222/RealVisXL_V4.0", torch_dtype="auto", use_safetensors=True)
     encoder = CLIPVisionModelWithProjection.from_pretrained("h94/IP-Adapter", subfolder="models/image_encoder")
     scene = AutoPipelineForText2Image.from_pretrained("stabilityai/stable-diffusion-xl-base-1.0", image_encoder=encoder)
     scene.load_ip_adapter("h94/IP-Adapter", subfolder="sdxl_models", weight_name="ip-adapter-plus-face_sdxl_vit-h.safetensors")
@@ -41,7 +41,7 @@ class AvatarGenerator:
         import torch
         from diffusers import AutoPipelineForText2Image, AutoPipelineForImage2Image
         self.pipe = AutoPipelineForText2Image.from_pretrained(
-            "stabilityai/stable-diffusion-xl-base-1.0", torch_dtype=torch.float16, variant="fp16"
+            "SG161222/RealVisXL_V4.0", torch_dtype=torch.float16, variant="fp16", use_safetensors=True
         ).to("cuda")
 
     @modal.method()
@@ -60,7 +60,7 @@ class AvatarGenerator:
                         "sequence, comparison, labels, numbers, symbols, text, watermark, black and white, monochrome, grayscale, "
                         "vintage photo, archival photo, mugshot, elderly, senior, aged face, harsh wrinkles, passport photo")
             base_seed = int(request.get("seed", 1))
-            pictures = [self.pipe(prompt=prompt, negative_prompt=negative, num_inference_steps=22, guidance_scale=6.5,
+            pictures = [self.pipe(prompt=prompt, negative_prompt=negative, num_inference_steps=28, guidance_scale=5.5,
                                   generator=torch.Generator(device="cuda").manual_seed(base_seed + index * 9973),
                                   height=768, width=768).images[0]
                         for index in range(min(int(request.get("count", 1)), 3))]
