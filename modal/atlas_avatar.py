@@ -84,7 +84,7 @@ class SceneGenerator:
     @modal.enter()
     def load(self):
         import torch
-        from diffusers import AutoPipelineForText2Image
+        from diffusers import AutoPipelineForText2Image, AutoPipelineForImage2Image
         from transformers import CLIPVisionModelWithProjection
         encoder = CLIPVisionModelWithProjection.from_pretrained(
             "h94/IP-Adapter", subfolder="models/image_encoder", torch_dtype=torch.float16)
