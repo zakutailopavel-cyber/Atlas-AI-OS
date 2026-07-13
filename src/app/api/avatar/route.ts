@@ -44,7 +44,7 @@ async function optimizeAvatarPrompt(source:string,appearance:string,blueprint:st
 
 export async function GET(){
   const {supabase,user}=await session();if(!user)return NextResponse.json({error:"Требуется авторизация"},{status:401});
-  await supabase.from("generation_jobs").update({status:"failed",error:"Превышено время ожидания"}).eq("status","queued").lt("created_at",new Date(Date.now()-10*60*1000).toISOString());
+  await supabase.from("generation_jobs").update({status:"failed",error:"Modal не нашёл свободный GPU за 7 минут. Нажми «Повторить» — описание сцены сохранено."}).eq("status","queued").lt("created_at",new Date(Date.now()-7*60*1000).toISOString());
   const {data,error}=await supabase.from("generation_jobs").select("id,model_id,kind,prompt,style,status,output_urls,error,created_at").order("created_at",{ascending:false}).limit(24);
   if(error)return NextResponse.json({error:"Очередь генераций не настроена"},{status:503});return NextResponse.json({jobs:data||[]});
 }
