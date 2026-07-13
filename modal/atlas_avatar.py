@@ -51,11 +51,9 @@ class AvatarGenerator:
         db.table("generation_jobs").update({"status":"processing","started_at":datetime.now(timezone.utc).isoformat()}).eq("id", job_id).execute()
         try:
             request, model = payload["request"], payload["model"]
-            prompt = (f"premium contemporary full-color lifestyle photograph, exactly one fictional adult woman, exactly one face, "
-                      f"age exactly as described, otherwise 30 years old, one frontal view, centered head-and-shoulders portrait, "
-                      f"warm natural studio light, soft beige neutral background, modern styling, {request['prompt']}, "
-                      f"mandatory unique identity: {request.get('identity_blueprint','')}, {request.get('style','')}, "
-                      "realistic facial asymmetry, natural skin pores, realistic eyes, professional 85mm portrait lens")
+            prompt = (f"{request['prompt']}, single contemporary full-color portrait, one woman, one face, "
+                      "frontal head-and-shoulders, warm natural light, neutral beige background, "
+                      "realistic skin texture, subtle facial asymmetry, professional 85mm lens")
             negative = ("generic instagram model, same face, lookalike, perfect symmetry, beauty filter, glamour retouching, "
                         "plastic skin, doll face, illustration, anime, painting, 3d render, extra person, extra face, profile view, "
                         "contact sheet, casting sheet, character sheet, photo grid, collage, multiple views, multiple panels, "
