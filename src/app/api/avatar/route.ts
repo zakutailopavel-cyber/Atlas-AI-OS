@@ -14,11 +14,30 @@ async function optimizeScenePrompt(source:string){
   }catch{return source}
 }
 
-async function optimizeAvatarPrompt(source:string,appearance:string){
-  if(!process.env.OPENAI_API_KEY)return `${source}. ${appearance}`.slice(0,650);
+const FACE_BLUEPRINTS=[
+  "oval face, high cheekbones, narrow straight nose, softly pointed chin, wide-set almond eyes",
+  "heart-shaped face, broad forehead, low cheekbones, small upturned nose, rounded chin, close-set round eyes",
+  "long rectangular face, strong jaw, prominent cheekbones, aquiline nose, deep-set hooded eyes",
+  "round face, full cheeks, short broad nose, delicate jaw, large downturned eyes",
+  "diamond-shaped face, narrow forehead, angular cheekbones, defined jaw, long nose, monolid eyes",
+  "square face, broad jaw, subtle cheekbones, straight brows, compact nose, widely spaced eyes",
+];
+const DISTINCTIVE_DETAILS=[
+  "a faint beauty mark below the left eye and slight natural eyebrow asymmetry",
+  "light freckles across the nose and a subtle cleft chin",
+  "one eyebrow sits slightly higher and the nose has a tiny natural bump",
+  "a small beauty mark on the right cheek and a softly asymmetric smile",
+  "subtle under-eye creases and a tiny scar through the left eyebrow",
+  "a defined cupid's bow and natural smile lines around the mouth",
+];
+function hash(value:string){return Array.from(value).reduce((result,char)=>(result*31+char.charCodeAt(0))>>>0,2166136261)}
+function identityBlueprint(modelId:string){const value=hash(modelId);return `${FACE_BLUEPRINTS[value%FACE_BLUEPRINTS.length]}, ${DISTINCTIVE_DETAILS[(value>>>8)%DISTINCTIVE_DETAILS.length]}`}
+
+async function optimizeAvatarPrompt(source:string,appearance:string,blueprint:string){
+  if(!process.env.OPENAI_API_KEY)return `${source}. ${appearance}. Identity geometry: ${blueprint}`.slice(0,750);
   try{
     const openai=new OpenAI({apiKey:process.env.OPENAI_API_KEY});
-    const response=await openai.responses.create({model:"gpt-5.4-mini",reasoning:{effort:"low"},store:false,max_output_tokens:150,instructions:"Create one concise English SDXL portrait prompt, maximum 55 words. Preserve exact age, face shape, eye color, hair color and texture, skin details and unique identifying features. Begin with RAW photorealistic headshot photo of one fictional adult. End with natural skin pores, 85mm lens, no illustration. Return only the prompt.",input:`User request: ${source}\nCharacter passport: ${appearance}`});
+    const response=await openai.responses.create({model:"gpt-5.4-mini",reasoning:{effort:"low"},store:false,max_output_tokens:180,instructions:"Create one concise English SDXL portrait prompt, maximum 70 words. The Identity geometry is mandatory and must dominate generic beauty language. Preserve explicit age, eye color, hair color and skin details. Avoid generic Instagram-model features, perfect symmetry and glamour retouching. Begin with RAW identity casting photo of one fictional adult. End with natural pores, realistic asymmetry, neutral 85mm headshot, no illustration. Return only the prompt.",input:`User request: ${source}\nCharacter passport: ${appearance}\nMandatory identity geometry: ${blueprint}`});
     return response.output_text?.trim()||source;
   }catch{return `${source}. ${appearance}`.slice(0,650)}
 }
@@ -36,12 +55,14 @@ export async function POST(request:Request){
   if(!body.model_id||!body.prompt)return NextResponse.json({error:"Выбери модель и добавь описание"},{status:400});
   const {data:model}=await supabase.from("ai_models").select("id,name,visual_passport").eq("id",body.model_id).single();if(!model)return NextResponse.json({error:"Модель не найдена"},{status:404});
   if(kind==="scene"&&!model.visual_passport?.avatar)return NextResponse.json({error:"Сначала выбери эталонное лицо"},{status:400});
-  const optimizedPrompt=kind==="scene"?await optimizeScenePrompt(body.prompt):await optimizeAvatarPrompt(body.prompt,model.visual_passport?.appearance||"");
+  const blueprint=identityBlueprint(model.id as string);
+  const optimizedPrompt=kind==="scene"?await optimizeScenePrompt(body.prompt):await optimizeAvatarPrompt(body.prompt,model.visual_passport?.appearance||"",blueprint);
   const count=kind==="scene"?1:Math.min(Number(body.count)||1,3);
-  const seed=Array.from(model.id as string).reduce((value,char)=>(value*31+char.charCodeAt(0))>>>0,2166136261);
+  const savedSeed=Number.parseInt(model.visual_passport?.seed||"",10);
+  const seed=Number.isFinite(savedSeed)?savedSeed:hash(model.id as string);
   const {data:job,error}=await supabase.from("generation_jobs").insert({model_id:model.id,kind,prompt:body.prompt,style:body.style||"photorealistic",count,status:"queued",created_by:user.id}).select("*").single();
   if(error)return NextResponse.json({error:"Очередь генераций не настроена"},{status:503});
-  if(process.env.MODAL_AVATAR_URL){try{const response=await fetch(process.env.MODAL_AVATAR_URL,{method:"POST",headers:{"content-type":"application/json","x-atlas-secret":process.env.ATLAS_WORKER_SECRET||""},body:JSON.stringify({job_id:job.id,model,request:{kind,prompt:optimizedPrompt,style:body.style,count,seed,reference_url:model.visual_passport?.avatar||null,source_url:body.source_url||null}})});if(!response.ok)throw new Error(`Modal ${response.status}`)}catch(error){await supabase.from("generation_jobs").update({status:"failed",error:error instanceof Error?error.message:"Облачный генератор недоступен"}).eq("id",job.id)}}
+  if(process.env.MODAL_AVATAR_URL){try{const response=await fetch(process.env.MODAL_AVATAR_URL,{method:"POST",headers:{"content-type":"application/json","x-atlas-secret":process.env.ATLAS_WORKER_SECRET||""},body:JSON.stringify({job_id:job.id,model,request:{kind,prompt:optimizedPrompt,style:body.style,count,seed,identity_blueprint:blueprint,reference_url:model.visual_passport?.avatar||null,source_url:body.source_url||null}})});if(!response.ok)throw new Error(`Modal ${response.status}`)}catch(error){await supabase.from("generation_jobs").update({status:"failed",error:error instanceof Error?error.message:"Облачный генератор недоступен"}).eq("id",job.id)}}
   return NextResponse.json({job,worker_connected:Boolean(process.env.MODAL_AVATAR_URL)});
 }
 
