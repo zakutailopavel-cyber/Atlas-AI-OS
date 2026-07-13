@@ -37,7 +37,7 @@ async function optimizeAvatarPrompt(source:string,appearance:string,blueprint:st
   if(!process.env.OPENAI_API_KEY)return `${source}. ${appearance}. Identity geometry: ${blueprint}`.slice(0,750);
   try{
     const openai=new OpenAI({apiKey:process.env.OPENAI_API_KEY});
-    const response=await openai.responses.create({model:"gpt-5.4-mini",reasoning:{effort:"low"},store:false,max_output_tokens:180,instructions:"Create one concise English SDXL prompt, maximum 70 words, for a premium contemporary COLOR lifestyle portrait. The Identity geometry is mandatory. Preserve an explicitly stated age; if no exact age is present, make her 30 years old. Ignore biography phrases about experience or many years when deciding age. Preserve eye color, hair color, skin and distinctive details. Exactly ONE fictional woman, ONE face, ONE frontal head-and-shoulders photograph, warm light neutral studio background. No contact sheet, grid, collage, profile, labels or numbers. Natural pores, realistic asymmetry, flattering 85mm lens. Return only the prompt.",input:`User request: ${source}\nCharacter passport: ${appearance}\nMandatory identity geometry: ${blueprint}`});
+    const response=await openai.responses.create({model:"gpt-5.4-mini",reasoning:{effort:"low"},store:false,max_output_tokens:180,instructions:"Turn the character profile into one concise English SDXL prompt, maximum 70 words, for a premium contemporary COLOR lifestyle portrait. Use the PROFILE as the source of truth; OPTIONAL ADJUSTMENTS may only refine it. The mandatory Identity geometry must make this person visibly distinct while remaining attractive and believable. Preserve explicit age, ancestry, face shape, eye color, nose, lips, hair, skin texture, freckles, moles and asymmetry. If age is absent, use 30. Exactly ONE fictional woman, ONE face, ONE frontal head-and-shoulders photo, warm neutral studio. No generic Instagram face, contact sheet, grid, labels or numbers. Return only the prompt.",input:`PROFILE: ${appearance}\nMANDATORY DISTINCT IDENTITY: ${blueprint}\nOPTIONAL ADJUSTMENTS: ${source||"none"}`});
     return response.output_text?.trim()||source;
   }catch{return `${source}. ${appearance}`.slice(0,650)}
 }
@@ -52,15 +52,18 @@ export async function GET(){
 export async function POST(request:Request){
   const {supabase,user}=await session();if(!user)return NextResponse.json({error:"Требуется авторизация"},{status:401});
   const body=await request.json(),kind=body.kind==="scene"?"scene":"avatar";
-  if(!body.model_id||!body.prompt)return NextResponse.json({error:"Выбери модель и добавь описание"},{status:400});
+  if(!body.model_id)return NextResponse.json({error:"Выбери AI-модель"},{status:400});
   const {data:model}=await supabase.from("ai_models").select("id,name,visual_passport").eq("id",body.model_id).single();if(!model)return NextResponse.json({error:"Модель не найдена"},{status:404});
+  if(kind==="avatar"&&!model.visual_passport?.appearance?.trim())return NextResponse.json({error:"Сначала заполни внешность в профиле AI-модели"},{status:400});
+  if(kind==="scene"&&!body.prompt?.trim())return NextResponse.json({error:"Опиши сцену, одежду и действие"},{status:400});
   if(kind==="scene"&&!model.visual_passport?.avatar)return NextResponse.json({error:"Сначала выбери эталонное лицо"},{status:400});
   const blueprint=identityBlueprint(model.id as string);
-  const optimizedPrompt=kind==="scene"?await optimizeScenePrompt(body.prompt):await optimizeAvatarPrompt(body.prompt,model.visual_passport?.appearance||"",blueprint);
+  const profileAppearance=[model.visual_passport?.appearance,model.visual_passport?.style,model.visual_passport?.immutable_facts].filter(Boolean).join(". ");
+  const optimizedPrompt=kind==="scene"?await optimizeScenePrompt(body.prompt):await optimizeAvatarPrompt(body.prompt||"",profileAppearance,blueprint);
   const count=kind==="scene"?1:Math.min(Number(body.count)||1,3);
   const savedSeed=Number.parseInt(model.visual_passport?.seed||"",10);
   const seed=Number.isFinite(savedSeed)?savedSeed:hash(model.id as string);
-  const {data:job,error}=await supabase.from("generation_jobs").insert({model_id:model.id,kind,prompt:body.prompt,style:body.style||"photorealistic",count,status:"queued",created_by:user.id}).select("*").single();
+  const {data:job,error}=await supabase.from("generation_jobs").insert({model_id:model.id,kind,prompt:body.prompt||"Профиль AI-модели",style:body.style||"photorealistic",count,status:"queued",created_by:user.id}).select("*").single();
   if(error)return NextResponse.json({error:"Очередь генераций не настроена"},{status:503});
   if(process.env.MODAL_AVATAR_URL){try{const response=await fetch(process.env.MODAL_AVATAR_URL,{method:"POST",headers:{"content-type":"application/json","x-atlas-secret":process.env.ATLAS_WORKER_SECRET||""},body:JSON.stringify({job_id:job.id,model,request:{kind,prompt:optimizedPrompt,style:body.style,count,seed,identity_blueprint:blueprint,reference_url:model.visual_passport?.avatar||null,source_url:body.source_url||null}})});if(!response.ok)throw new Error(`Modal ${response.status}`)}catch(error){await supabase.from("generation_jobs").update({status:"failed",error:error instanceof Error?error.message:"Облачный генератор недоступен"}).eq("id",job.id)}}
   return NextResponse.json({job,worker_connected:Boolean(process.env.MODAL_AVATAR_URL)});
