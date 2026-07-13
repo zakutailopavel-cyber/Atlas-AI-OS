@@ -1,5 +1,6 @@
 import io
 import os
+import re
 import secrets
 from datetime import datetime, timezone
 import modal
@@ -51,16 +52,25 @@ class AvatarGenerator:
         db.table("generation_jobs").update({"status":"processing","started_at":datetime.now(timezone.utc).isoformat()}).eq("id", job_id).execute()
         try:
             request, model = payload["request"], payload["model"]
-            prompt = (f"{request['prompt']}, single contemporary full-color portrait, one woman, one face, "
+            age_match = re.search(r"\b(\d{2})-year-old\b", request["prompt"], re.IGNORECASE)
+            age = int(age_match.group(1)) if age_match else 30
+            if age <= 30:
+                age_anchor = f"exactly {age} years old, unmistakably a young adult woman in her twenties, youthful full cheeks, smooth firm forehead"
+            elif age <= 39:
+                age_anchor = f"exactly {age} years old, youthful adult woman in her thirties, firm natural skin"
+            else:
+                age_anchor = f"exactly {age} years old"
+            prompt = (f"{age_anchor}, {request['prompt']}, single contemporary full-color portrait, one woman, one face, "
                       "frontal head-and-shoulders, warm natural light, neutral beige background, "
                       "realistic skin texture, subtle facial asymmetry, professional 85mm lens")
-            negative = ("generic instagram model, same face, lookalike, perfect symmetry, beauty filter, glamour retouching, "
+            negative = ("middle-aged, mature woman, older woman, elderly, aged face, forehead wrinkles, crow feet, under-eye bags, "
+                        "deep nasolabial folds, hollow cheeks, sagging skin, gray hair, generic instagram model, same face, lookalike, "
                         "plastic skin, doll face, illustration, anime, painting, 3d render, extra person, extra face, profile view, "
                         "contact sheet, casting sheet, character sheet, photo grid, collage, multiple views, multiple panels, "
                         "sequence, comparison, labels, numbers, symbols, text, watermark, black and white, monochrome, grayscale, "
-                        "vintage photo, archival photo, mugshot, elderly, senior, aged face, harsh wrinkles, passport photo")
+                        "vintage photo, archival photo, mugshot, passport photo")
             base_seed = int(request.get("seed", 1))
-            pictures = [self.pipe(prompt=prompt, negative_prompt=negative, num_inference_steps=28, guidance_scale=5.5,
+            pictures = [self.pipe(prompt=prompt, negative_prompt=negative, num_inference_steps=30, guidance_scale=7.0,
                                   generator=torch.Generator(device="cuda").manual_seed(base_seed + index * 9973),
                                   height=768, width=768).images[0]
                         for index in range(min(int(request.get("count", 1)), 3))]
