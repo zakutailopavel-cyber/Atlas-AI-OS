@@ -92,7 +92,9 @@ class SceneGenerator:
             "stabilityai/stable-diffusion-xl-base-1.0", image_encoder=encoder,
             torch_dtype=torch.float16, variant="fp16").to("cuda")
         self.pipe.load_ip_adapter("h94/IP-Adapter", subfolder="sdxl_models", weight_name="ip-adapter-plus-face_sdxl_vit-h.safetensors")
-        self.pipe.set_ip_adapter_scale(0.48)
+        # A slightly stronger face reference keeps the selected character stable
+        # without preventing the scene prompt from changing clothing and setting.
+        self.pipe.set_ip_adapter_scale(0.58)
         self.img2img = AutoPipelineForImage2Image.from_pipe(self.pipe)
         self.reference_cache = {}
 
@@ -109,13 +111,21 @@ class SceneGenerator:
             if reference_url not in self.reference_cache:
                 self.reference_cache[reference_url] = Image.open(requests.get(reference_url, timeout=30, stream=True).raw).convert("RGB")
             reference = self.reference_cache[reference_url]
-            prompt = (f"one adult woman only, solo, exactly one person and one face, {request['prompt']}, "
+            framing = request.get("framing", "waist_up")
+            framing_prompt = {
+                "close_up": "tight head-and-shoulders portrait, face fills most of the image, eye-level camera",
+                "waist_up": "medium waist-up portrait, woman fills most of the image, face large and clearly visible, eye-level camera",
+                "full_body": "full-body portrait, entire woman visible, woman occupies at least two thirds of the image, face clearly visible",
+            }.get(framing, "medium waist-up portrait, woman fills most of the image, face large and clearly visible, eye-level camera")
+            prompt = (f"one adult woman only, {framing_prompt}, solo, exactly one person and one face, {request['prompt']}, "
                       f"same fictional character as reference, {memory.get('appearance','')[:140]}, {memory.get('style','')[:80]}, "
                       f"{request.get('style','')}, exact requested action and object, photorealistic editorial photography, "
                       "natural skin, correct anatomy, two hands, no text")
             negative = ("two people, multiple people, duplicate person, twins, extra face, reflected face, extra head, "
                         "extra arms, extra hands, extra fingers, fused body, wrong object, cup, mug, food, text, watermark, "
                         "plastic skin, illustration, low quality, blurry, collage, diptych, triptych, split screen, multiple panels")
+            if framing != "full_body":
+                negative += ", distant subject, tiny person, tiny face, extreme wide shot, excessive empty space, full body"
             source_url = request.get("source_url")
             if source_url:
                 source = Image.open(requests.get(source_url, timeout=30, stream=True).raw).convert("RGB").resize((768, 1024))
