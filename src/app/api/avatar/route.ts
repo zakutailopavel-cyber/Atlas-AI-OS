@@ -5,11 +5,19 @@ export const runtime="nodejs";
 
 async function session(){const supabase=await createClient(),{data:{user}}=await supabase.auth.getUser();return {supabase,user}}
 
-async function optimizeScenePrompt(source:string){
+const SCENE_FRAMING={
+  close_up:"tight head-and-shoulders portrait, face fills most of the frame, eye-level camera",
+  waist_up:"medium waist-up portrait, subject fills most of the frame, face clearly visible, eye-level camera",
+  full_body:"full-body portrait, entire person visible, subject occupies at least two thirds of the frame, face clearly visible",
+} as const;
+type SceneFraming=keyof typeof SCENE_FRAMING;
+function sceneFraming(value:unknown):SceneFraming{return value==="close_up"||value==="full_body"?value:"waist_up"}
+
+async function optimizeScenePrompt(source:string,framing:SceneFraming){
   if(!process.env.OPENAI_API_KEY)return source;
   try{
     const openai=new OpenAI({apiKey:process.env.OPENAI_API_KEY});
-    const response=await openai.responses.create({model:"gpt-5.4-mini",reasoning:{effort:"low"},store:false,max_output_tokens:120,instructions:"Convert the user's Russian scene request into one concise English image-generation prompt of no more than 45 words. Put the subject, exact action, required object and location first. Include camera framing and lighting. Exactly one adult fictional woman. Return only the prompt, no commentary.",input:source});
+    const response=await openai.responses.create({model:"gpt-5.4-mini",reasoning:{effort:"low"},store:false,max_output_tokens:120,instructions:"Convert the user's Russian scene request into one concise English image-generation prompt of no more than 38 words. Put the subject, exact action, required object and location first. Exactly one adult fictional woman. Preserve the required framing. Return only the prompt, no commentary.",input:`REQUIRED FRAMING: ${SCENE_FRAMING[framing]}\nSCENE: ${source}`});
     return response.output_text?.trim()||source;
   }catch{return source}
 }
@@ -59,13 +67,14 @@ export async function POST(request:Request){
   if(kind==="scene"&&!model.visual_passport?.avatar)return NextResponse.json({error:"Сначала выбери эталонное лицо"},{status:400});
   const blueprint=identityBlueprint(model.id as string);
   const profileAppearance=[model.visual_passport?.appearance,model.visual_passport?.style,model.visual_passport?.immutable_facts].filter(Boolean).join(". ");
-  const optimizedPrompt=kind==="scene"?await optimizeScenePrompt(body.prompt):await optimizeAvatarPrompt(body.prompt||"",profileAppearance,blueprint);
+  const framing=sceneFraming(body.framing);
+  const optimizedPrompt=kind==="scene"?`${SCENE_FRAMING[framing]}, ${await optimizeScenePrompt(body.prompt,framing)}`:await optimizeAvatarPrompt(body.prompt||"",profileAppearance,blueprint);
   const count=kind==="scene"?1:Math.min(Number(body.count)||1,3);
   const savedSeed=Number.parseInt(model.visual_passport?.seed||"",10);
   const seed=Number.isFinite(savedSeed)?savedSeed:hash(model.id as string);
   const {data:job,error}=await supabase.from("generation_jobs").insert({model_id:model.id,kind,prompt:body.prompt||"Профиль AI-модели",style:body.style||"photorealistic",count,status:"queued",created_by:user.id}).select("*").single();
   if(error)return NextResponse.json({error:"Очередь генераций не настроена"},{status:503});
-  if(process.env.MODAL_AVATAR_URL){try{const response=await fetch(process.env.MODAL_AVATAR_URL,{method:"POST",headers:{"content-type":"application/json","x-atlas-secret":process.env.ATLAS_WORKER_SECRET||""},body:JSON.stringify({job_id:job.id,model,request:{kind,prompt:optimizedPrompt,style:body.style,count,seed,identity_blueprint:blueprint,reference_url:model.visual_passport?.avatar||null,source_url:body.source_url||null}})});if(!response.ok)throw new Error(`Modal ${response.status}`)}catch(error){await supabase.from("generation_jobs").update({status:"failed",error:error instanceof Error?error.message:"Облачный генератор недоступен"}).eq("id",job.id)}}
+  if(process.env.MODAL_AVATAR_URL){try{const response=await fetch(process.env.MODAL_AVATAR_URL,{method:"POST",headers:{"content-type":"application/json","x-atlas-secret":process.env.ATLAS_WORKER_SECRET||""},body:JSON.stringify({job_id:job.id,model,request:{kind,prompt:optimizedPrompt,style:body.style,framing,count,seed,identity_blueprint:blueprint,reference_url:model.visual_passport?.avatar||null,source_url:body.source_url||null}})});if(!response.ok)throw new Error(`Modal ${response.status}`)}catch(error){await supabase.from("generation_jobs").update({status:"failed",error:error instanceof Error?error.message:"Облачный генератор недоступен"}).eq("id",job.id)}}
   return NextResponse.json({job,worker_connected:Boolean(process.env.MODAL_AVATAR_URL)});
 }
 
