@@ -10,7 +10,7 @@ app = modal.App("atlas-avatar-generator")
 def download_models():
     from diffusers import AutoPipelineForText2Image
     from transformers import CLIPVisionModelWithProjection
-    AutoPipelineForText2Image.from_pretrained("stabilityai/sdxl-turbo")
+    AutoPipelineForText2Image.from_pretrained("stabilityai/stable-diffusion-xl-base-1.0")
     encoder = CLIPVisionModelWithProjection.from_pretrained("h94/IP-Adapter", subfolder="models/image_encoder")
     scene = AutoPipelineForText2Image.from_pretrained("stabilityai/stable-diffusion-xl-base-1.0", image_encoder=encoder)
     scene.load_ip_adapter("h94/IP-Adapter", subfolder="sdxl_models", weight_name="ip-adapter-plus-face_sdxl_vit-h.safetensors")
@@ -41,7 +41,7 @@ class AvatarGenerator:
         import torch
         from diffusers import AutoPipelineForText2Image, AutoPipelineForImage2Image
         self.pipe = AutoPipelineForText2Image.from_pretrained(
-            "stabilityai/sdxl-turbo", torch_dtype=torch.float16, variant="fp16"
+            "stabilityai/stable-diffusion-xl-base-1.0", torch_dtype=torch.float16, variant="fp16"
         ).to("cuda")
 
     @modal.method()
@@ -51,10 +51,13 @@ class AvatarGenerator:
         db.table("generation_jobs").update({"status":"processing","started_at":datetime.now(timezone.utc).isoformat()}).eq("id", job_id).execute()
         try:
             request, model = payload["request"], payload["model"]
-            prompt = (f"{request['prompt']}, one person only, centered head and shoulders, symmetrical composition, "
-                      f"{request.get('style','')}, real photograph, natural skin pores, realistic eyes, no text, no drawing")
+            prompt = (f"{request['prompt']}, mandatory unique identity: {request.get('identity_blueprint','')}, "
+                      f"one fictional adult only, centered head and shoulders, {request.get('style','')}, "
+                      "identity casting photograph, realistic facial asymmetry, natural skin pores, realistic eyes, 85mm lens")
+            negative = ("generic instagram model, same face, lookalike, perfect symmetry, beauty filter, glamour retouching, "
+                        "plastic skin, doll face, illustration, anime, painting, 3d render, extra person, text, watermark")
             base_seed = int(request.get("seed", 1))
-            pictures = [self.pipe(prompt=prompt, num_inference_steps=4, guidance_scale=0.0,
+            pictures = [self.pipe(prompt=prompt, negative_prompt=negative, num_inference_steps=22, guidance_scale=6.5,
                                   generator=torch.Generator(device="cuda").manual_seed(base_seed + index * 9973),
                                   height=768, width=768).images[0]
                         for index in range(min(int(request.get("count", 1)), 3))]
