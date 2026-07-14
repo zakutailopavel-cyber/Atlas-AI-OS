@@ -345,9 +345,17 @@ Structured match комбинируется с semantic embedding описани
 
 URL, timestamps, job ID, user-facing punctuation и порядок JSON keys в fingerprint не входят.
 
-### 12.2. Idempotency
+### 12.2. Tenant boundary
 
-До GPU dispatch выполняется атомарная регистрация fingerprint:
+`render_fingerprint` описывает параметры рендера и может совпасть у разных владельцев. Он никогда не является самостоятельным cache key. Полный ключ кэша — строго (`owner_id`, `render_fingerprint`), а ключ повторной отправки — (`owner_id`, `idempotency_key`). `owner_id` определяется server-side из авторизованного tenant/team context и не принимается на доверии из клиентского body.
+
+Любой cache lookup обязан начинаться с `owner_id = authenticated_owner_id`. Запрещены поиск только по fingerprint, fallback в кэш другого владельца, глобальное переиспользование результата и выдача signed URL до проверки владельца. Даже при полностью одинаковом fingerprint два владельца получают независимые request/cache namespaces.
+
+Output разрешается только через принадлежащий владельцу request: сначала выбирается `reference_render_requests` по (`owner_id`, `render_fingerprint`) или (`owner_id`, `idempotency_key`), затем `reference_render_outputs` связывается по `request_id`. Service-role worker применяет тот же tenant predicate явно; его технические полномочия не расширяют видимость кэша.
+
+### 12.3. Idempotency
+
+До GPU dispatch выполняется атомарная регистрация fingerprint внутри текущего `owner_id`:
 
 1. `completed + accepted` — вернуть готовый результат без GPU;
 2. `queued | processing` — присоединить клиента к существующему request;
@@ -355,7 +363,7 @@ URL, timestamps, job ID, user-facing punctuation и порядок JSON keys в 
 4. `failed` — retry использует тот же logical request и увеличивает `attempt`, а не создаёт независимый дубль;
 5. новый fingerprint — создать request и получить единственный dispatch lock.
 
-Уникальный partial constraint должен исключать более одного активного request на fingerprint. Кнопка повторной отправки клиента использует постоянный `idempotency_key`. Принудительный новый вариант требует `variant_nonce`, явного подтверждения стоимости и создаёт новый fingerprint.
+Constraints unique (`owner_id`, `render_fingerprint`) и unique (`owner_id`, `idempotency_key`) исключают дубли только внутри одного владельца. Кнопка повторной отправки клиента использует постоянный `idempotency_key` в том же tenant context. Принудительный новый вариант требует `variant_nonce`, явного подтверждения стоимости и создаёт новый fingerprint.
 
 Кэш готового результата не имеет TTL, пока reference, license, Character Brain revision и pipeline revision действительны. Изменение любого из них инвалидирует match естественным образом через fingerprint; отзыв лицензии дополнительно блокирует старую запись.
 
@@ -486,8 +494,9 @@ Embedding пересчитывается только при изменении 
 | Поле | Тип | Назначение |
 | --- | --- | --- |
 | `id` | uuid PK | Logical request |
-| `render_fingerprint` | text unique | Дедупликация |
-| `idempotency_key` | text | Защита повторного submit |
+| `owner_id` | uuid | Обязательный tenant/team owner; определяется server-side |
+| `render_fingerprint` | text | Дедупликация только в scope владельца |
+| `idempotency_key` | text | Защита повторного submit только в scope владельца |
 | `reference_version_id` | uuid | Исходная сцена |
 | `character_id`, `character_revision` | uuid, integer | Снимок identity |
 | `mode`, `render_plan` | enum, jsonb | Versioned plan |
@@ -496,6 +505,8 @@ Embedding пересчитывается только при изменении 
 | `dispatch_lock_at` | timestamptz nullable | Единственный GPU dispatch |
 | `estimated_cost`, `actual_cost` | numeric nullable | Бюджет |
 | `created_by`, timestamps | audit | История |
+
+Constraints: unique (`owner_id`, `render_fingerprint`) и unique (`owner_id`, `idempotency_key`). Глобальная уникальность `render_fingerprint` или `idempotency_key` запрещена: совпадение между владельцами допустимо, но не создаёт право видеть или повторно использовать чужой request/output. `reference_version_id`, `character_id` и каждый output, доступный через `request_id`, должны принадлежать тому же `owner_id`.
 
 ### 16.7. `reference_render_outputs`
 
@@ -563,6 +574,8 @@ Source originals, masks и license documents должны быть private; по
 ## 20. Безопасность и отказоустойчивость
 
 - Пользователь не может подменить `owner_id`, license verdict, Character Brain revision или Storage path в клиентском payload.
+- Cache lookup, idempotency lookup и выдача output всегда фильтруются по server-side `owner_id`; fingerprint или idempotency key без tenant predicate не используются ни в одном trusted path.
+- Результат другого владельца/команды никогда не возвращается, не присоединяется к request и не используется как cache hit, даже если fingerprint полностью совпадает.
 - Service-role используется только worker/backend; signed URLs имеют минимальный TTL.
 - Server-side preflight повторно проверяет права непосредственно перед dispatch.
 - Retry имеет `max_attempts`; timeout не создаёт новый logical request.
@@ -590,7 +603,7 @@ Reference-first v1 считается реализованным только к
 - locked regions технически защищены, а не описаны только prompt;
 - character identity берётся из versioned Character Brain context;
 - поиск воспроизводим и сохраняет score breakdown;
-- одинаковый fingerprint не создаёт второй GPU dispatch;
+- одинаковый fingerprint внутри одного `owner_id` не создаёт второй GPU dispatch, а между владельцами остаётся изолированным;
 - output содержит полную lineage и QA metrics;
 - rejected output не попадает в повторный подбор;
 - originals и license documents не публикуются напрямую;
