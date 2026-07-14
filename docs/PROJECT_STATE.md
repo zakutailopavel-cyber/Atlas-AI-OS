@@ -41,7 +41,7 @@
 | 02 — Сцены и референсы | Modal, IP-Adapter/InstantID, сцены, улучшение, кэш | Подготовлен reference-first контракт: versioned источники, metadata, лицензии, change regions, подбор, дедупликация и QA лица/сцены | Согласовать целевую схему и реализовать ingest + cache preflight без GPU |
 | 03 — Контент-фабрика | Публикации, тексты, изображения, материалы, календарь | Подготовлен контракт Content Pipeline v1: единый lifecycle, ручной approval, межобластные payload и idempotency генерации/публикации | Согласовать статусы и реализовать server-side revisions + approval gate без изменения UI |
 | 04 — Интерфейс Atlas | Дизайн, адаптивность, модальные окна, карточки | Подготовлен контракт UI Modules v1: feature-границы, props, единые actions/modal, три status-слоя, approval gate и безопасная декомпозиция без редизайна | Начать с baseline screenshots и механического извлечения типов + UI primitives |
-| 05 — Backend и инфраструктура | Supabase, Storage, RLS, Vercel, Modal, auth, расходы | В draft PR восстановлены корректный lockfile и воспроизводимая CI-сборка без GPU | Зафиксировать полную схему БД, ошибки и бюджетные лимиты |
+| 05 — Backend и инфраструктура | Supabase, Storage, RLS, Vercel, Modal, auth, расходы | Подготовлен минимальный физический data contract: tenant/RLS, revisions, approval, idempotency, Storage и безопасный migration rollout | Снять production schema inventory и подготовить первый additive tenant migration |
 
 ## Открытые PR и решения
 
@@ -85,6 +85,7 @@
 
 | Дата | Область | Состояние | Изменение | PR/коммит |
 | --- | --- | --- | --- | --- |
+| 2026-07-14 | 05 | В работе | Согласована минимальная физическая модель данных и безопасный порядок будущих migrations без изменения production | draft PR |
 | 2026-07-14 | 04 | В работе | Зафиксирован план декомпозиции интерфейса по модулям без изменения дизайна и runtime | draft PR |
 | 2026-07-14 | 03 | В работе | Зафиксирован единый жизненный цикл публикации от идеи до аналитики без изменения runtime | draft PR |
 | 2026-07-14 | 02 | В работе | Зафиксирован reference-first контракт библиотеки сцен без изменения runtime и схемы данных | draft PR |
