@@ -49,7 +49,7 @@
 | 02 — Сцены и референсы | Modal, IP-Adapter/InstantID, сцены, улучшение, кэш | Подготовлен reference-first контракт: versioned источники, metadata, лицензии, change regions, подбор, дедупликация и QA лица/сцены | Согласовать целевую схему и реализовать ingest + cache preflight без GPU |
 | 03 — Контент-фабрика | Публикации, тексты, изображения, материалы, календарь | Подготовлен контракт Content Pipeline v1: единый lifecycle, ручной approval, межобластные payload и idempotency генерации/публикации | Согласовать статусы и реализовать server-side revisions + approval gate без изменения UI |
 | 04 — Интерфейс Atlas | Дизайн, адаптивность, модальные окна, карточки | Подготовлен контракт UI Modules v1: feature-границы, props, единые actions/modal, три status-слоя, approval gate и безопасная декомпозиция без редизайна | Начать с baseline screenshots и механического извлечения типов + UI primitives |
-| 05 — Backend и инфраструктура | Supabase, Storage, RLS, Vercel, Modal, auth, расходы | Снят read-only production Supabase inventory: подтверждены schema/RLS/Storage, migration gaps, отсутствие owner boundary и legacy data risks | Подготовить воспроизводимый baseline и отдельно согласовать additive tenant migration без изменения production |
+| 05 — Backend и инфраструктура | Supabase, Storage, RLS, Vercel, Modal, auth, расходы | Зафиксирован runtime/schema drift `content_items`: `asset_url` и `review_comment` отсутствуют в production и определены как nullable legacy bridge без approval/publication semantics | Подготовить воспроизводимый baseline, затем отдельную additive migration bridge-полей и error handling runtime |
 
 ## Открытые PR и решения
 
@@ -93,6 +93,7 @@
 
 | Дата | Область | Состояние | Изменение | PR/коммит |
 | --- | --- | --- | --- | --- |
+| 2026-07-16 | 05 | В работе | Прослежен lifecycle `asset_url`/`review_comment` и зафиксирован безопасный порядок устранения runtime/schema drift без изменения production | draft PR |
 | 2026-07-16 | 05 | В работе | Зафиксирован обезличенный read-only inventory production Supabase и расхождения со схемой, migrations и data contract | draft PR |
 | 2026-07-15 | 00 | В работе | Зафиксировано назначение Atlas как внутренней многопользовательской фабрики для роста и монетизации аудитории, не SaaS | draft PR |
 | 2026-07-14 | 05 | В работе | Согласована минимальная физическая модель данных и безопасный порядок будущих migrations без изменения production | draft PR |
