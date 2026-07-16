@@ -241,7 +241,7 @@ Policies на `storage.objects`:
 
 - 1 model имеет несколько primary references;
 - найден 1 лишний primary row сверх допустимого одного на model;
-- найдено 5 duplicate locator groups в пределах model + `storage_path`;
+- найдено 5 групп записей с одинаковым `storage_path` во всей таблице `model_references`. Inventory не устанавливает, находятся ли эти дубли внутри одной модели или между разными моделями;
 - точные locator values намеренно не выводились.
 
 До добавления unique primary constraint требуется ручное, tenant-safe решение о каноническом primary. Дубли нельзя удалять автоматически: одинаковый locator может отражать legacy историю или разные назначения.
