@@ -27,7 +27,7 @@ Atlas является внутренней многопользовательс
 | `auth.users` | Supabase Auth, `auth.uid()` | Управляется Supabase |
 | `profiles` | `id`, `email`, `role`, `created_at`; роль читается при входе и список команды читается клиентом | Нет |
 | `ai_models` | `id`, `name`, `handle`, `niche`, `bio`, `status`, `visual_passport`, `created_by`, `created_at` | Нет |
-| `content_items` | `id`, `model_id`, `title`, `platform`, `format`, `status`, `caption`, `visual_prompt`, `shot_list`, `publish_at`, `asset_url`, `review_comment`, `created_by`, `created_at` | Нет |
+| `content_items` | Production: `id`, `model_id`, `title`, `platform`, `format`, `status`, `caption`, `visual_prompt`, `shot_list`, `publish_at`, `created_by`, `created_at`, `updated_at`. Runtime также ожидает отсутствующие в production nullable legacy bridge-поля `asset_url` и `review_comment` | Нет |
 | `generation_jobs` | Очередь `avatar/scene`, prompt/style/count, transport status, provider IDs, `output_urls`, error и timestamps | Да |
 | `model_references` | Материалы модели: `candidate/primary/reference`, `storage_path`, legacy job link и audit | Да |
 | `storage.buckets/objects` | Публичный bucket `atlas-assets`; Modal пишет `avatars/{model_id}/{job_id}-{index}-{random}.jpg` | Частично |
