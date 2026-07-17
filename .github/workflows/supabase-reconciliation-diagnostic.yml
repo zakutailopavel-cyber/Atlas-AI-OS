@@ -1,0 +1,128 @@
+name: Temporary Supabase reconciliation diagnostic
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/supabase-reconciliation-diagnostic.yml"
+      - "production-reconciliation-preflight.sql"
+      - "supabase/tests/diagnostics/reconciliation-object-names.sql"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: supabase-reconciliation-diagnostic-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  compare-manifests:
+    name: Compare clean-chain and production manifests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Verify exact preflight checksum
+        shell: bash
+        run: |
+          expected="551ab3c134db084ebfa8bb568214b00df662eae39511906b2b8707d786e54248"
+          actual="$(sha256sum production-reconciliation-preflight.sql | cut -d ' ' -f 1)"
+          test "$actual" = "$expected"
+
+      - name: Install pinned Supabase CLI
+        uses: supabase/setup-cli@v2.1.1
+        with:
+          version: 2.109.1
+
+      - name: Verify CLI version
+        shell: bash
+        run: test "$(supabase --version)" = "2.109.1"
+
+      - name: Apply 0600 through 0800 to isolated PostgreSQL 17
+        run: supabase db start
+
+      - name: Verify exact local migration history
+        shell: bash
+        run: |
+          versions="$(docker exec supabase_db_atlas-ai-os-migration-ci \
+            psql -U postgres -d postgres -qAt -v ON_ERROR_STOP=1 \
+            -c "select string_agg(version, ',' order by version) from supabase_migrations.schema_migrations")"
+          test "$versions" = "202607120600,202607120700,202607120800"
+
+      - name: Run existing clean-chain schema assertions
+        run: supabase test db --local
+
+      - name: Run exact reconciliation preflight without logging Manifest B
+        shell: bash
+        run: |
+          docker exec -i supabase_db_atlas-ai-os-migration-ci \
+            psql -U postgres -d postgres -qAt -v ON_ERROR_STOP=1 \
+            < production-reconciliation-preflight.sql \
+            > "$RUNNER_TEMP/local-preflight.json"
+          jq -e '.atlas_manifest_a.components and .operational_manifest_b' \
+            "$RUNNER_TEMP/local-preflight.json" > /dev/null
+
+      - name: Print safe function and trigger names
+        shell: bash
+        run: |
+          echo "classification|object_type|schema|object_name"
+          docker exec -i supabase_db_atlas-ai-os-migration-ci \
+            psql -U postgres -d postgres -qAt -F '|' -v ON_ERROR_STOP=1 \
+            < supabase/tests/diagnostics/reconciliation-object-names.sql
+
+      - name: Compare Manifest A component hashes
+        shell: bash
+        run: |
+          mismatch=0
+          {
+            echo "| Component | Production | Local | Match |"
+            echo "| --- | --- | --- | --- |"
+          } | tee -a "$GITHUB_STEP_SUMMARY"
+
+          while IFS='|' read -r component local_hash; do
+            case "$component" in
+              columns) expected="2b4787e0e3bef2d954da7227bdb9c5d8" ;;
+              constraints) expected="526c9aa5fe821d0ab2bb2d12453f9f4e" ;;
+              functions) expected="e5d8f69e342b0967a1a1e594af380568" ;;
+              indexes) expected="d4ef795409e4886cb1fad4bdf322ece3" ;;
+              policies) expected="2461eff7821b06ee7127fa581592dac1" ;;
+              relations_and_rls) expected="713119461081133d9d95cbea6fce500a" ;;
+              storage_bucket_metadata) expected="69f19180c4643234da80b3c360dded7f" ;;
+              triggers) expected="f77ec1ebac94b46ad4498e077fa306ad" ;;
+              *) echo "Unexpected component: $component"; exit 1 ;;
+            esac
+
+            if [[ "$local_hash" == "$expected" ]]; then
+              match="yes"
+            else
+              match="NO"
+              mismatch=1
+            fi
+
+            echo "$component|$expected|$local_hash|$match"
+            echo "| $component | \`$expected\` | \`$local_hash\` | $match |" \
+              >> "$GITHUB_STEP_SUMMARY"
+          done < <(jq -r '.atlas_manifest_a.components[] | [.component, .hash] | join("|")' \
+            "$RUNNER_TEMP/local-preflight.json")
+
+          local_overall="$(jq -r '.atlas_manifest_a.overall_hash' \
+            "$RUNNER_TEMP/local-preflight.json")"
+          production_overall="667f8e50aa43b29e9accc2928b03aafa"
+          if [[ "$local_overall" == "$production_overall" ]]; then
+            overall_match="yes"
+          else
+            overall_match="NO"
+            mismatch=1
+          fi
+          echo "overall|$production_overall|$local_overall|$overall_match"
+          echo "| overall | \`$production_overall\` | \`$local_overall\` | $overall_match |" \
+            >> "$GITHUB_STEP_SUMMARY"
+
+          exit "$mismatch"
+
+      - name: Remove local Supabase volumes
+        if: always()
+        run: supabase stop --no-backup
