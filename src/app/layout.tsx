@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { GeistMono, GeistSans } from "geist/font";
 import "./globals.css";
 import "./dashboard.css";
 import "./ai.css";
@@ -10,16 +10,6 @@ import "./avatar.css";
 import "./character.css";
 import "./library.css";
 import "./refinement.css";
-
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
 
 export const metadata: Metadata = {
   title: "Atlas AI OS",
@@ -35,7 +25,7 @@ export default function RootLayout({
   return (
     <html
       lang="ru"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      className={`${GeistSans.variable} ${GeistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">{children}</body>
     </html>
