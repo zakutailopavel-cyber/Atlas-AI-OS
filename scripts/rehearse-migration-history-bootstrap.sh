@@ -25,16 +25,16 @@ require_command() {
 require_command supabase
 require_command psql
 require_command sha256sum
-require_command rsync
-
 if [[ -f "${ROOT_DIR}/supabase/.temp/project-ref" ]]; then
   echo "Refusing to run with a local linked Supabase project in the repository checkout." >&2
   exit 1
 fi
 
 mkdir -p "${WORK_DIR}/supabase/migrations"
-rsync -a --exclude='.temp' "${ROOT_DIR}/supabase/" "${WORK_DIR}/supabase/"
-rm -f "${WORK_DIR}/supabase/migrations/202607170900_tenant_foundation.sql"
+cp "${ROOT_DIR}/supabase/config.toml" "${WORK_DIR}/supabase/config.toml"
+cp "${ROOT_DIR}/supabase/migrations/202607120600_core_schema_baseline.sql" "${WORK_DIR}/supabase/migrations/"
+cp "${ROOT_DIR}/supabase/migrations/202607120700_avatar_generation.sql" "${WORK_DIR}/supabase/migrations/"
+cp "${ROOT_DIR}/supabase/migrations/202607120800_character_scenes.sql" "${WORK_DIR}/supabase/migrations/"
 
 cd "${WORK_DIR}"
 
@@ -122,7 +122,7 @@ echo "Confirmed repaired history contains exactly 0600, 0700, and 0800."
 
 cp "${ROOT_DIR}/supabase/migrations/202607170900_tenant_foundation.sql" "${WORK_DIR}/supabase/migrations/"
 
-dry_run_output="$(supabase db push --local --dry-run 2>&1 || true)"
+dry_run_output="$(supabase db push --local --dry-run 2>&1)"
 printf '%s\n' "${dry_run_output}"
 if ! grep -q '202607170900' <<<"${dry_run_output}"; then
   echo "Expected 202607170900 to remain pending in dry-run output." >&2

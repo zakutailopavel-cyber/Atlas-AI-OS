@@ -111,7 +111,7 @@ This evidence confirms schema equivalence only; it does not authorize production
 
 ### 3.5. Isolated history-bootstrap rehearsal workflow
 
-Issue #56 adds a repository workflow for the next gate without authorizing production access. The workflow `migration-history-rehearsal.yml` runs only in an ephemeral GitHub Actions/local Supabase runner with Supabase CLI `2.109.1`; it does not use `supabase link`, `--linked`, repository secrets, production credentials, remote database URLs, OpenAI API, Modal GPU, or social publishing.
+Issue #56 / draft PR #57 adds a repository workflow for the next gate without authorizing production access. The workflow `migration-history-rehearsal.yml` runs only in an ephemeral GitHub Actions/local Supabase runner with Supabase CLI `2.109.1`; it does not use `supabase link`, `--linked`, repository secrets, production credentials, remote database URLs, OpenAI API, Modal GPU, or social publishing.
 
 The rehearsal script creates a disposable copy of `supabase/config.toml` and only migrations `0600 → 0700 → 0800`, starts local Supabase, removes only the local `supabase_migrations` schema to reproduce the missing-history pre-state, and then uses supported local CLI commands `supabase migration repair ... --status applied --local` for exactly:
 
@@ -120,6 +120,8 @@ The rehearsal script creates a disposable copy of `supabase/config.toml` and onl
 - `202607120800`.
 
 It records an Atlas schema manifest hash before and after repair and fails if the hash changes. After repair it copies `202607170900_tenant_foundation.sql` into the disposable migration directory and requires `supabase db push --local --dry-run` to show `202607170900` pending while `public.workspaces` and `public.workspace_members` remain absent. This proves the rehearsal does not apply `0900` and does not alter Atlas schema while bootstrapping history.
+
+Confirmed GitHub Actions rehearsal run `29614156122` passed with Atlas schema hash `f6671afc61a6441dc0be4c793070a4e1e84f0ea5da3127f572ecfa1e88469bee` before and after repair. The resulting history contained exactly `202607120600`, `202607120700`, and `202607120800`; `202607170900` remained pending; production and Supabase Cloud were not connected.
 
 Limitations: this is a local Supabase/PostgreSQL rehearsal, not a production or staging clone. It proves the supported CLI path and expected invariants in an isolated runner, but production reconciliation remains forbidden until all manual gates in this runbook are completed.
 

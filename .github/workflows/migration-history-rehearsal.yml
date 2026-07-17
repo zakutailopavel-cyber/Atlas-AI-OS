@@ -3,11 +3,12 @@ name: Migration history bootstrap rehearsal
 on:
   pull_request:
     paths:
-      - "supabase/migrations/**"
-      - "supabase/config.toml"
       - "scripts/rehearse-migration-history-bootstrap.sh"
       - ".github/workflows/migration-history-rehearsal.yml"
-      - "docs/architecture/PRODUCTION_MIGRATION_RECONCILIATION.md"
+      - "supabase/migrations/202607120600_core_schema_baseline.sql"
+      - "supabase/migrations/202607120700_avatar_generation.sql"
+      - "supabase/migrations/202607120800_character_scenes.sql"
+      - "supabase/migrations/202607170900_tenant_foundation.sql"
   workflow_dispatch:
 
 permissions:
@@ -33,7 +34,7 @@ jobs:
           version: 2.109.1
 
       - name: Install PostgreSQL client
-        run: sudo apt-get update && sudo apt-get install --yes postgresql-client rsync
+        run: sudo apt-get update && sudo apt-get install --yes postgresql-client
 
       - name: Rehearse missing history bootstrap in isolated local Supabase
         run: scripts/rehearse-migration-history-bootstrap.sh
