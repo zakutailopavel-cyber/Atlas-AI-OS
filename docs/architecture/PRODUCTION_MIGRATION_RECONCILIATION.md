@@ -86,6 +86,28 @@ Read-only inventory от 2026-07-16 подтвердил:
 - timestamps и порядок production DDL неизвестны;
 - migration history нельзя восстанавливать только по конечному состоянию без повторного preflight.
 
+
+### 3.4. Diagnostic evidence 2026-07-17
+
+Documentation-only task 05-I records the confirmed diagnostic evidence without adding workflows, SQL files, raw inventory, full GitHub Actions logs, credentials, UUIDs, emails, Storage paths, or user data. The temporary draft PR #43 that produced the diagnostic workflow was closed without merge, and the temporary workflow itself is intentionally not part of the repository.
+
+Confirmed facts:
+
+- GitHub Actions diagnostic run `29589401343` completed successfully.
+- The clean chain `0600 → 0700 → 0800` was applied in an isolated Supabase/PostgreSQL 17 environment.
+- Local migration history contained exactly these versions and no others:
+  - `202607120600`;
+  - `202607120700`;
+  - `202607120800`.
+- All 16 pgTAP checks passed.
+- All eight production/local component hashes matched.
+- The production/local overall hash matched: `667f8e50aa43b29e9accc2928b03aafa`.
+- Three functions and four triggers were classified as Supabase Storage-managed objects, not Atlas-specific schema.
+- Production was not connected to or changed during the diagnostic workflow.
+- Schema equivalence between the production snapshot and the clean migration chain is confirmed for the compared manifests.
+
+This evidence confirms schema equivalence only; it does not authorize production migration-history reconciliation. Production repair remains prohibited. The next gate is a separate rehearsal that bootstraps the missing migration history without connecting to production.
+
 ## 4. Что известно и не известно о production migration history
 
 ### Известно

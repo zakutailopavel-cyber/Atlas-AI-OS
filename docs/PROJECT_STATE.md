@@ -49,7 +49,7 @@
 | 02 — Сцены и референсы | Modal, IP-Adapter/InstantID, сцены, улучшение, кэш | Подготовлен reference-first контракт: versioned источники, metadata, лицензии, change regions, подбор, дедупликация и QA лица/сцены | Согласовать целевую схему и реализовать ingest + cache preflight без GPU |
 | 03 — Контент-фабрика | Публикации, тексты, изображения, материалы, календарь | Подготовлен контракт Content Pipeline v1: единый lifecycle, ручной approval, межобластные payload и idempotency генерации/публикации | Согласовать статусы и реализовать server-side revisions + approval gate без изменения UI |
 | 04 — Интерфейс Atlas | Дизайн, адаптивность, модальные окна, карточки | Подготовлен контракт UI Modules v1: feature-границы, props, единые actions/modal, три status-слоя, approval gate и безопасная декомпозиция без редизайна | Начать с baseline screenshots и механического извлечения типов + UI primitives |
-| 05 — Backend и инфраструктура | Supabase, Storage, RLS, Vercel, Modal, auth, расходы | Подготовлен проверяемый runbook production migration-history reconciliation для `0600 → 0700 → 0800` без подключения и изменений production | После ручного разрешения выполнить повторный read-only preflight и staging rehearsal; production repair пока запрещён |
+| 05 — Backend и инфраструктура | Supabase, Storage, RLS, Vercel, Modal, auth, расходы | Зафиксировано доказательство schema equivalence: diagnostic run `29589401343`, clean chain `0600 → 0700 → 0800`, 16 pgTAP checks, совпадение 8 component hashes и overall hash `667f8e50aa43b29e9accc2928b03aafa`; production не подключался и не изменялся | Следующий gate — отдельный rehearsal bootstrap отсутствующей migration history без подключения к production; production repair запрещён |
 
 ## Открытые PR и решения
 
@@ -90,6 +90,7 @@
 
 | Дата | Область | Состояние | Изменение | PR/коммит |
 | --- | --- | --- | --- | --- |
+| 2026-07-17 | 05 | В работе | Зафиксировано evidence schema equivalence: PR #43 закрыт без merge, diagnostic run `29589401343` успешен, clean chain и production/local hashes совпали; следующий gate — rehearsal bootstrap history без production | draft PR |
 | 2026-07-17 | 00 | В работе | Geist Sans и Geist Mono переведены с build-time Google Fonts на локальный пакет того же шрифта для воспроизводимой сборки Codex Cloud | draft PR |
 | 2026-07-17 | 05 | В работе | Подготовлен gated runbook reconciliation migration history с read-only preflight, staging, backup, rollback и ручными разрешениями без изменения production | draft PR |
 | 2026-07-17 | 00 | В работе | Общая память синхронизирована с `main` `4434803`; закрытые P0 удалены, следующий этап — безопасный migration-history reconciliation | draft PR |
