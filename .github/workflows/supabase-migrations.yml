@@ -5,7 +5,6 @@ on:
     paths:
       - "supabase/migrations/**"
       - "supabase/tests/**"
-      - "supabase/config.toml"
       - ".github/workflows/supabase-migrations.yml"
   push:
     branches:
@@ -13,7 +12,6 @@ on:
     paths:
       - "supabase/migrations/**"
       - "supabase/tests/**"
-      - "supabase/config.toml"
       - ".github/workflows/supabase-migrations.yml"
   workflow_dispatch:
 
