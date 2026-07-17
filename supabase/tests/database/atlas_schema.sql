@@ -2,7 +2,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 
-select plan(16);
+select plan(27);
 
 select has_table('public', 'profiles', 'profiles exists');
 select has_table('public', 'ai_models', 'ai_models exists');
@@ -20,9 +20,10 @@ select results_eq(
     values
       ('202607120600'::text),
       ('202607120700'::text),
-      ('202607120800'::text)
+      ('202607120800'::text),
+      ('202607170900'::text)
   $$,
-  'the complete 0600 -> 0700 -> 0800 chain is recorded'
+  'the complete 0600 -> 0700 -> 0800 -> 0900 chain is recorded'
 );
 
 select set_eq(
@@ -45,7 +46,12 @@ select set_eq(
         ('generation_jobs', 'kind'),
         ('model_references', 'id'),
         ('model_references', 'model_id'),
-        ('model_references', 'storage_path')
+        ('model_references', 'storage_path'),
+        ('workspaces', 'id'),
+        ('workspaces', 'name'),
+        ('workspace_members', 'owner_id'),
+        ('workspace_members', 'user_id'),
+        ('content_items', 'owner_id')
       )
   $$,
   $$
@@ -64,7 +70,12 @@ select set_eq(
       ('generation_jobs:kind'),
       ('model_references:id'),
       ('model_references:model_id'),
-      ('model_references:storage_path')
+      ('model_references:storage_path'),
+      ('workspaces:id'),
+      ('workspaces:name'),
+      ('workspace_members:owner_id'),
+      ('workspace_members:user_id'),
+      ('content_items:owner_id')
   $$,
   'key Atlas columns match the baseline chain'
 );
@@ -81,7 +92,9 @@ select set_eq(
         'ai_models',
         'content_items',
         'generation_jobs',
-        'model_references'
+        'model_references',
+        'workspaces',
+        'workspace_members'
       )
   $$,
   $$
@@ -105,7 +118,16 @@ select set_eq(
       ('model_references_model_id_fkey'),
       ('model_references_kind_check'),
       ('model_references_generation_job_id_fkey'),
-      ('model_references_created_by_fkey')
+      ('model_references_created_by_fkey'),
+      ('workspaces_pkey'),
+      ('workspaces_created_by_fkey'),
+      ('workspaces_status_check'),
+      ('workspace_members_pkey'),
+      ('workspace_members_owner_id_fkey'),
+      ('workspace_members_user_id_fkey'),
+      ('workspace_members_role_check'),
+      ('workspace_members_status_check'),
+      ('content_items_owner_id_fkey')
   $$,
   'Atlas constraints match the baseline chain'
 );
@@ -121,12 +143,14 @@ select is(
         'ai_models',
         'content_items',
         'generation_jobs',
-        'model_references'
+        'model_references',
+        'workspaces',
+        'workspace_members'
       )
       and rel.relrowsecurity
   ),
-  5,
-  'RLS is enabled on all five Atlas tables'
+  7,
+  'RLS is enabled on all Atlas tables including tenant foundation'
 );
 
 select set_eq(
@@ -138,7 +162,9 @@ select set_eq(
       'ai_models',
       'content_items',
       'generation_jobs',
-      'model_references'
+      'model_references',
+      'workspaces',
+      'workspace_members'
     )) or (schemaname = 'storage' and tablename = 'objects')
   $$,
   $$
@@ -158,7 +184,14 @@ select set_eq(
       ('public.model_references:team creates model references'),
       ('public.model_references:team updates own model references'),
       ('storage.objects:authenticated reads atlas assets'),
-      ('storage.objects:service uploads atlas assets')
+      ('storage.objects:service uploads atlas assets'),
+      ('public.workspaces:workspace members can view workspaces'),
+      ('public.workspaces:workspace creators can view own workspaces'),
+      ('public.workspaces:authenticated users can create own workspace'),
+      ('public.workspaces:workspace owners can update workspaces'),
+      ('public.workspace_members:workspace members can view memberships'),
+      ('public.workspace_members:workspace creators can create owner membership'),
+      ('public.workspace_members:workspace owners can manage memberships')
   $$,
   'legacy Atlas policy names match the migration chain'
 );
@@ -216,18 +249,92 @@ select is(
         'ai_models',
         'content_items',
         'generation_jobs',
-        'model_references'
+        'model_references',
+        'workspaces',
+        'workspace_members'
       )
       and column_name in (
         'asset_url',
         'review_comment',
-        'owner_id',
         'workspace',
         'workspace_id'
       )
   ),
   0,
-  'future bridge and ownership columns are absent'
+  'future non-owner bridge columns are absent'
+);
+
+select has_table('public', 'workspaces', 'workspaces exists');
+select has_table('public', 'workspace_members', 'workspace_members exists');
+select has_column('public', 'content_items', 'owner_id', 'content_items nullable owner_id bridge exists');
+
+select is(
+  (
+    select is_nullable
+    from information_schema.columns
+    where table_schema = 'public'
+      and table_name = 'content_items'
+      and column_name = 'owner_id'
+  ),
+  'YES',
+  'content_items.owner_id remains nullable before backfill and cutover'
+);
+
+select has_function('public', 'is_workspace_member', array['uuid'], 'membership helper exists');
+select has_function('public', 'has_workspace_role', array['uuid', 'text[]'], 'role helper exists');
+
+select is(
+  (
+    select prosecdef
+    from pg_proc p
+    join pg_namespace n on n.oid = p.pronamespace
+    where n.nspname = 'public'
+      and p.proname = 'is_workspace_member'
+      and p.proargtypes = '2950'::oidvector
+  ),
+  true,
+  'is_workspace_member is security definer'
+);
+
+select is(
+  (
+    select prosecdef
+    from pg_proc p
+    join pg_namespace n on n.oid = p.pronamespace
+    where n.nspname = 'public'
+      and p.proname = 'has_workspace_role'
+      and p.proargtypes = '2950 1009'::oidvector
+  ),
+  true,
+  'has_workspace_role is security definer'
+);
+
+select isnt_empty(
+  $$
+    select 1
+    from pg_proc p
+    join pg_namespace n on n.oid = p.pronamespace
+    where n.nspname = 'public'
+      and p.proname in ('is_workspace_member', 'has_workspace_role')
+      and pg_get_functiondef(p.oid) like '%auth.uid()%'
+  $$,
+  'membership helpers derive users from auth.uid()'
+);
+
+select is(
+  (
+    select count(*)::integer
+    from pg_policies
+    where schemaname = 'public'
+      and tablename = 'content_items'
+      and policyname in (
+        'team can view content',
+        'team can create content',
+        'team can update content'
+      )
+  ),
+  3,
+  'legacy broad content_items policies are still present for pre-cutover compatibility'
 );
 
 select is(
@@ -236,10 +343,27 @@ select is(
     from information_schema.tables
     where table_schema = 'public'
       and table_type = 'BASE TABLE'
-      and table_name ~ '(workspace|approval)'
+      and table_name like '%approval%'
   ),
   0,
-  'workspace and approval tables are absent'
+  'approval tables remain absent in tenant foundation PR'
+);
+
+select is(
+  (
+    select count(*)::integer
+    from pg_indexes
+    where schemaname = 'public'
+      and indexname in (
+        'workspaces_status_idx',
+        'workspaces_created_by_idx',
+        'workspace_members_user_id_idx',
+        'workspace_members_active_owner_role_idx',
+        'content_items_owner_id_idx'
+      )
+  ),
+  5,
+  'tenant foundation indexes exist'
 );
 
 select * from finish();
