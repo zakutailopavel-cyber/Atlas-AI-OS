@@ -8,7 +8,7 @@
 - Production: https://atlas.epkoolitus.ee
 - Основной стек: Next.js 16, React 19, TypeScript, Supabase, Vercel, Modal GPU, OpenAI API.
 - Основная ветка: `main`.
-- Подтверждённый снимок `main`: `4434803` от 2026-07-17 — clean-environment Supabase baseline и изолированная CI-проверка полного migration chain.
+- Подтверждённый снимок `main`: `1c06253` от 2026-07-17 — runbook production migration-history reconciliation после clean-environment Supabase baseline и CI-проверки migration chain.
 - Production на момент проверки 2026-07-13 отвечает и перенаправляет неавторизованного пользователя на `/login`.
 
 ## Как пользоваться этим файлом
@@ -44,7 +44,7 @@
 
 | Область | Ответственность | Текущее состояние | Ближайший фокус |
 | --- | --- | --- | --- |
-| 00 — Координатор | Архитектура, приоритеты, roadmap, контроль PR | Общая память актуализирована по подтверждённому `main` `4434803`; закрытые инфраструктурные P0 удалены | Контроль безопасного плана production migration-history reconciliation и актуального roadmap |
+| 00 — Координатор | Архитектура, приоритеты, roadmap, контроль PR | Общая память актуализирована по подтверждённому `main` `1c06253`; подготовлен локальный Geist для воспроизводимой сборки без build-time Google Fonts | Контроль безопасного плана production migration-history reconciliation и актуального roadmap |
 | 01 — AI-модели и Character Brain | Профили, внешность, seed, эталонное лицо, память | Подготовлен контракт Character Brain v1: обязательные поля, immutable facts, versioned memory, visual identity, voice и минимальные payload | Реализовать server-side legacy adapter без изменения данных |
 | 02 — Сцены и референсы | Modal, IP-Adapter/InstantID, сцены, улучшение, кэш | Подготовлен reference-first контракт: versioned источники, metadata, лицензии, change regions, подбор, дедупликация и QA лица/сцены | Согласовать целевую схему и реализовать ingest + cache preflight без GPU |
 | 03 — Контент-фабрика | Публикации, тексты, изображения, материалы, календарь | Подготовлен контракт Content Pipeline v1: единый lifecycle, ручной approval, межобластные payload и idempotency генерации/публикации | Согласовать статусы и реализовать server-side revisions + approval gate без изменения UI |
@@ -53,7 +53,7 @@
 
 ## Открытые PR и решения
 
-- На подтверждённом снимке `main` открытых PR нет.
+- До текущего draft PR на подтверждённом снимке `main` открытых PR не было.
 - Каждый новый PR должен быть узким и относиться к одной области. Межобластные изменения сначала согласуются в области 00.
 
 ## Известные риски и технический долг
@@ -90,6 +90,7 @@
 
 | Дата | Область | Состояние | Изменение | PR/коммит |
 | --- | --- | --- | --- | --- |
+| 2026-07-17 | 00 | В работе | Geist Sans и Geist Mono переведены с build-time Google Fonts на локальный пакет того же шрифта для воспроизводимой сборки Codex Cloud | draft PR |
 | 2026-07-17 | 05 | В работе | Подготовлен gated runbook reconciliation migration history с read-only preflight, staging, backup, rollback и ручными разрешениями без изменения production | draft PR |
 | 2026-07-17 | 00 | В работе | Общая память синхронизирована с `main` `4434803`; закрытые P0 удалены, следующий этап — безопасный migration-history reconciliation | draft PR |
 | 2026-07-17 | 05 | В работе | Добавлена изолированная CI-проверка полного Supabase migration chain, Atlas schema/RLS/policies и отсутствия будущих полей без подключения к production | draft PR |
@@ -104,7 +105,6 @@
 | 2026-07-14 | 01 | В работе | Зафиксирован архитектурный контракт Character Brain v1 без изменения runtime | draft PR |
 | 2026-07-14 | 05 | В работе | Восстановлены корректный lockfile и CI-проверка `npm ci` + `npm run build` без GPU | draft PR |
 | 2026-07-14 | 00 | В работе | Добавлена единая память проекта и правила передачи состояния между чатами | draft PR |
-| 2026-07-13 | 02/04 | В `main` | Управление кадром и полноэкранный просмотр сцен | `5782424` / #28 |
 
 ## Шаблон передачи состояния после работы
 
