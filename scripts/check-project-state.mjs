@@ -8,8 +8,14 @@ function requireIncludes(needle, label = needle) {
   if (!text.includes(needle)) errors.push(`Missing required content: ${label}`);
 }
 
-if (/^(<<<<<<<|=======|>>>>>>>) /m.test(text)) {
-  errors.push('PROJECT_STATE.md contains Git conflict markers.');
+const conflictMarkers = [
+  { pattern: /^<<<<<<< .+$/m, label: '<<<<<<< HEAD-style start marker' },
+  { pattern: /^=======$/m, label: '======= separator marker' },
+  { pattern: /^>>>>>>> .+$/m, label: '>>>>>>> branch-style end marker' },
+];
+
+for (const { pattern, label } of conflictMarkers) {
+  if (pattern.test(text)) errors.push(`PROJECT_STATE.md contains Git conflict marker: ${label}.`);
 }
 
 for (const section of [
