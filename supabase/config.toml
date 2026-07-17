@@ -1,0 +1,17 @@
+# Local-only configuration for the isolated migration CI database.
+# No hosted Supabase project is linked or addressed by this file.
+project_id = "atlas-ai-os-migration-ci"
+
+[db]
+port = 54322
+shadow_port = 54320
+health_timeout = "2m"
+major_version = 17
+
+[db.migrations]
+enabled = true
+schema_paths = []
+
+[db.seed]
+enabled = false
+sql_paths = []

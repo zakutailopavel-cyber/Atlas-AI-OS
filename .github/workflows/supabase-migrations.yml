@@ -1,0 +1,56 @@
+name: Supabase migration chain
+
+on:
+  pull_request:
+    paths:
+      - "supabase/migrations/**"
+      - "supabase/tests/**"
+      - "supabase/config.toml"
+      - ".github/workflows/supabase-migrations.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "supabase/migrations/**"
+      - "supabase/tests/**"
+      - "supabase/config.toml"
+      - ".github/workflows/supabase-migrations.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: supabase-migrations-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify-migrations:
+    name: Apply and verify migrations
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install pinned Supabase CLI
+        uses: supabase/setup-cli@v2.1.1
+        with:
+          version: 2.109.1
+
+      - name: Show Supabase CLI version
+        run: supabase --version
+
+      # db start creates a disposable local Postgres/Supabase database and
+      # applies every repository migration in filename order. This workflow
+      # never links to or addresses a hosted Supabase project.
+      - name: Apply migrations to isolated local Supabase
+        run: supabase db start
+
+      - name: Verify migrated schema
+        run: supabase test db --local
+
+      - name: Remove local Supabase volumes
+        if: always()
+        run: supabase stop --no-backup
