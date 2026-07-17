@@ -8,7 +8,7 @@
 - Production: https://atlas.epkoolitus.ee
 - Основной стек: Next.js 16, React 19, TypeScript, Supabase, Vercel, Modal GPU, OpenAI API.
 - Основная ветка: `main`.
-- Подтверждённый снимок `main`: `b4c665a` от 2026-07-17 — слит PR #55, защита `main` зафиксирована активной; draft PR #57 открыт для Issue #56 migration-history rehearsal; production не подключался и не изменялся.
+- Подтверждённый снимок `main`: `8d838a1` от 2026-07-18 — PR #57 слит, isolated migration-history rehearsal подтверждён; production и Supabase Cloud не подключались и не изменялись.
 - Production на момент проверки 2026-07-13 отвечает и перенаправляет неавторизованного пользователя на `/login`.
 
 ## Как пользоваться этим файлом
@@ -44,20 +44,20 @@
 
 | Область | Ответственность | Текущее состояние | Ближайший фокус |
 | --- | --- | --- | --- |
-| 00 — Координатор | Архитектура, приоритеты, roadmap, контроль PR | Общая память актуализирована по подтверждённому `main` `b4c665a`; для Issue #56 открыт draft PR #57; GitHub Actions rehearsal run `29614156122` подтвердил history bootstrap без production/Supabase Cloud | Review draft PR #57, merge оставить ручным действием владельца/координатора |
+| 00 — Координатор | Архитектура, приоритеты, roadmap, контроль PR | Общая память актуализирована по подтверждённому `main` `8d838a1`; PR #57 слит, открытых PR нет | Следующий gate — отдельное решение о production migration-history reconciliation без выполнения production-команд |
 | 01 — AI-модели и Character Brain | Профили, внешность, seed, эталонное лицо, память | Подготовлен контракт Character Brain v1: обязательные поля, immutable facts, versioned memory, visual identity, voice и минимальные payload | Реализовать server-side legacy adapter без изменения данных |
 | 02 — Сцены и референсы | Modal, IP-Adapter/InstantID, сцены, улучшение, кэш | Подготовлен reference-first контракт: versioned источники, metadata, лицензии, change regions, подбор, дедупликация и QA лица/сцены | Согласовать целевую схему и реализовать ingest + cache preflight без GPU |
 | 03 — Контент-фабрика | Публикации, тексты, изображения, материалы, календарь | Подготовлен контракт Content Pipeline v1: единый lifecycle, ручной approval, межобластные payload и idempotency генерации/публикации | Согласовать статусы и реализовать server-side revisions + approval gate без изменения UI |
 | 04 — Интерфейс Atlas | Дизайн, адаптивность, модальные окна, карточки | Подготовлен контракт UI Modules v1: feature-границы, props, единые actions/modal, три status-слоя, approval gate и безопасная декомпозиция без редизайна | Начать с baseline screenshots и механического извлечения типов + UI primitives |
-| 05 — Backend и инфраструктура | Supabase, Storage, RLS, Vercel, Modal, auth, расходы | Issue #56 draft PR #57 подтвердил isolated GitHub Actions rehearsal run `29614156122`: schema hash до/после `f6671afc61a6441dc0be4c793070a4e1e84f0ea5da3127f572ecfa1e88469bee`, history ровно `0600`, `0700`, `0800`, `0900` pending, production/Supabase Cloud не подключались | Review draft PR #57; production reconciliation остаётся за отдельными ручными gates |
+| 05 — Backend и инфраструктура | Supabase, Storage, RLS, Vercel, Modal, auth, расходы | PR #57 слит: isolated GitHub Actions rehearsal run `29614156122` подтвердил неизменный schema hash, history ровно `0600`, `0700`, `0800` и pending `0900`; production/Supabase Cloud не подключались | Подготовить отдельное ручное решение по production reconciliation; выполнение запрещено до прохождения всех gates runbook |
 
 ## Открытые PR и решения
 
 - PR #53 слит в `main`: Project state workflow запускается на каждом PR.
 - PR #51 слит в `main`: добавлены Atlas issue/PR templates и workflow проверки PROJECT_STATE.md.
 - PR #50 закрыт без merge.
-- PR #44, #45, #46, #47, #49, #51, #53 и #55 слиты в `main`; актуальный подтверждённый `main` — `b4c665a`.
-- Для Issue #56 открыт реальный draft PR #57; перед его созданием GitHub API вернул 0 других открытых PR, пересечений файлов не было.
+- PR #44, #45, #46, #47, #49, #51, #53, #55 и #57 слиты в `main`; актуальный подтверждённый `main` — `8d838a1`.
+- Issue #56 выполнена и PR #57 слит; на момент синхронизации открытых PR нет.
 - Read-only проверка GitHub ruleset `Protect main` 2026-07-17 подтвердила `active` enforcement для default branch, обязательный PR, запрет branch deletion/non-fast-forward и required status checks `build` + `check-project-state`.
 - Каждый новый PR должен быть узким и относиться к одной области. Межобластные изменения сначала согласуются в области 00.
 
@@ -76,7 +76,7 @@
 
 ## Текущие приоритеты
 
-1. P0: review draft PR #57 с подтверждённым isolated rehearsal run `29614156122`; merge оставить ручным действием владельца/координатора.
+1. P0: принять отдельное ручное решение о production migration-history reconciliation по подтверждённому runbook; production-команды пока запрещены.
 2. P0: подготовить безопасный план production migration-history reconciliation без исполнения clean-only baseline на существующей базе.
 3. P0: определить реалистичный lint baseline и добавить отдельную проверку без скрытия ошибок или отключения правил.
 4. P1: после reconciliation добавить nullable legacy bridge-поля `asset_url` и `review_comment` отдельной additive migration и исправить runtime error handling.
@@ -96,7 +96,7 @@
 
 | Дата | Область | Состояние | Изменение | PR/коммит |
 | --- | --- | --- | --- | --- |
-| 2026-07-17 | 05 | В работе | Draft PR #57: GitHub Actions rehearsal run `29614156122` подтвердил hash до/после `f6671afc61a6441dc0be4c793070a4e1e84f0ea5da3127f572ecfa1e88469bee`, history ровно `0600`, `0700`, `0800`, `0900` pending; production/Supabase Cloud не подключались | draft PR #57 |
+| 2026-07-18 | 05 | Завершено | PR #57 слит: GitHub Actions rehearsal run `29614156122` подтвердил одинаковый schema hash до/после, history ровно `0600`, `0700`, `0800` и pending `0900`; production/Supabase Cloud не подключались | PR #57 / `8d838a1` |
 | 2026-07-17 | 00 | Завершено | PR #55 слит: подтверждённый `main` — `b4c665a`, активная защита `main` зафиксирована; следующий текущий review — draft PR #57 для Issue #56 | PR #55 / `b4c665a` |
 | 2026-07-17 | 00 | Завершено | PR #53 слит: Project state workflow запускается на каждом PR; GitHub ruleset `Protect main` настроен вручную без изменений из этого PR | PR #53 / `5a0988b` |
 | 2026-07-17 | 05 | Завершено | PR #49 слит: additive tenant foundation `0900` вошла в `main`; без backfill, runtime/UI, production cutover и production-доступа | PR #49 / `792c35d` |
