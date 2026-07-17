@@ -162,7 +162,18 @@ Read-only inventory от 2026-07-16 подтвердил:
 
 ## 7. Schema-equivalence contract
 
-До и после rehearsal/production repair строятся два обезличенных canonical manifests.
+До и после rehearsal/production repair строятся три обезличенных canonical manifests.
+
+### History Manifest — migration history
+
+Включает детерминированно отсортированные:
+
+- наличие или отсутствие schema `supabase_migrations`;
+- наличие или отсутствие table `supabase_migrations.schema_migrations`;
+- если table существует — columns, normalized types/defaults/nullable, constraints и indexes;
+- migration versions и names без SQL contents.
+
+Если preflight подтвердит отсутствие history table, её bootstrap поддерживаемым `migration repair` является ожидаемым изменением **только после успешного staging rehearsal и ручных gates G3/G4**. Rehearsal должен заранее подтвердить точную структуру создаваемой CLI table. Прямое создание или исправление history schema/table SQL-командами не допускается.
 
 ### Manifest A — Atlas schema
 
@@ -190,7 +201,8 @@ Read-only inventory от 2026-07-16 подтвердил:
 
 - Manifest A до и после repair должен быть byte-equivalent после normalization.
 - Manifest B должен быть идентичен при остановленных writes.
-- Единственное ожидаемое изменение находится вне Manifest A/B: history versions последовательно становятся `0600`, затем `0600+0700`, затем `0600+0700+0800`.
+- History Manifest изменяется только по подтверждённому rehearsal-сценарию: при необходимости CLI создаёт history schema/table, затем versions последовательно становятся `0600`, `0600+0700`, `0600+0700+0800`.
+- Если history table существовала до repair, её structure должна остаться идентичной; меняется только ожидаемый набор versions.
 - Любое другое изменение означает STOP и rollback/incident review.
 
 ## 8. Staging/rehearsal
@@ -199,14 +211,14 @@ Rehearsal обязателен и выполняется только после
 
 1. Создать изолированный staging clone из максимально свежего production backup либо восстановить backup в новый проект. Не использовать live production как rehearsal.
 2. Не сохранять backup, credentials или user data в repository/CI artifacts. Ограничить доступ и retention staging.
-3. Подтвердить на staging Manifest A/B и исходное состояние migration history.
+3. Подтвердить на staging History Manifest, Manifest A/B и исходное состояние migration history.
 4. Если staging restore уже переносит history, отдельно воспроизвести сценарий production pre-state в disposable копии; не удалять history на единственном staging.
 5. Закрепить CLI `2.109.1` и repository commit.
 6. Выполнить кандидатный repair последовательно: `0600`, verify; `0700`, verify; `0800`, verify.
-7. После каждого шага сравнить Manifest A/B и history versions.
+7. После каждого шага сравнить History Manifest, Manifest A/B и history versions.
 8. После `0800` выполнить только dry-run pending-migration check: ожидается ноль migrations к применению.
 9. Выполнить обычные Auth/runtime smoke checks без Modal GPU, OpenAI API и новых Storage uploads.
-10. Полностью проверить rollback в reverse order на отдельной disposable копии, затем повторить forward rehearsal.
+10. Проверить удаление history records в reverse order на отдельной disposable копии, зафиксировать оставшееся состояние history schema/table, затем повторить forward rehearsal. Это не считается полным возвратом к pre-state, если history table изначально отсутствовала.
 
 Если `migration repair` не умеет создать отсутствующую history table на staging, rehearsal останавливается. Следующий шаг — официальный Supabase Support/документированный способ bootstrap history; прямой `CREATE SCHEMA/TABLE` или ручной `INSERT` не допускается.
 
@@ -219,7 +231,7 @@ Rehearsal обязателен и выполняется только после
 1. Остановить application writes и schema deployments.
 2. Зафиксировать время, operator, reviewer, commit и CLI version.
 3. Подтвердить restorable backup и его timestamp.
-4. Снять pre-change Manifest A/B и history snapshot.
+4. Снять pre-change History Manifest, Manifest A/B и history snapshot.
 5. Повторить все stop criteria.
 
 ### Phase 1 — зарегистрировать `0600`
@@ -227,7 +239,7 @@ Rehearsal обязателен и выполняется только после
 1. Пометить только version `202607120600` как applied через поддерживаемый CLI history repair.
 2. Не исполнять содержимое migration `0600`.
 3. Подтвердить history set `{202607120600}`.
-4. Сравнить Manifest A/B с pre-change.
+4. Сравнить History Manifest и Manifest A/B с pre-change contract.
 5. Reviewer даёт G5 для продолжения.
 
 ### Phase 2 — зарегистрировать `0700`
@@ -235,7 +247,7 @@ Rehearsal обязателен и выполняется только после
 1. Пометить только version `202607120700` как applied.
 2. Не исполнять DDL/policies/bucket insert migration `0700`.
 3. Подтвердить history set `{202607120600, 202607120700}`.
-4. Повторить Manifest A/B comparison.
+4. Повторить History Manifest и Manifest A/B comparison.
 5. Reviewer даёт G5 для продолжения.
 
 ### Phase 3 — зарегистрировать `0800`
@@ -243,7 +255,7 @@ Rehearsal обязателен и выполняется только после
 1. Пометить только version `202607120800` как applied.
 2. Не исполнять ALTER/policies migration `0800`.
 3. Подтвердить history set `{202607120600, 202607120700, 202607120800}`.
-4. Повторить Manifest A/B comparison.
+4. Повторить History Manifest и Manifest A/B comparison.
 5. Проверить, что dry-run не предлагает ни одну repository migration.
 
 ### Phase 4 — закрытие
@@ -279,7 +291,6 @@ supabase db push --linked --dry-run
 ```bash
 # Могут исполнять DDL или разрушать remote state.
 supabase db push --linked
-supabase db reset --linked
 
 # Может создать новый local migration и интерактивно обновить remote history.
 supabase db pull
@@ -290,6 +301,7 @@ supabase db pull
 - запускать SQL-файлы `0600`, `0700`, `0800` в production SQL Editor;
 - направлять на production любую команду, исполняющую migration SQL;
 - создавать `supabase_migrations` schema/table прямым SQL;
+- вручную выполнять `DROP TABLE` или `DROP SCHEMA` для migration history;
 - делать `INSERT`, `UPDATE` или `DELETE` history records вручную;
 - использовать `--include-all`, `--yes` или automation без межшаговых gates;
 - печатать credentials/connection strings в shell history, logs или PR;
@@ -307,15 +319,17 @@ supabase db pull
 - ожидаемые RPO/RTO и допустимый downtime;
 - что database backup не содержит сами Storage object binaries и план восстановления учитывает это ограничение.
 
-### History-only rollback
+### History-record rollback
 
-Если repair изменил только history records, rollback выполняется поддерживаемым CLI со status `reverted` в reverse order и с теми же gates:
+`migration repair --status reverted` удаляет зарегистрированные records, но не гарантирует удаление созданной history table или schema. Удаление records выполняется поддерживаемым CLI в reverse order и с теми же gates:
 
 1. `0800`;
 2. `0700`;
 3. `0600`.
 
-После каждого reverted record проверяются history и Manifest A/B. Эти команды также запрещены до отдельного решения владельца.
+После каждого reverted record проверяются History Manifest и Manifest A/B. Эти команды также запрещены до отдельного решения владельца.
+
+Если history table отсутствовала в pre-state, пустая table/schema после удаления records означает, что исходное состояние восстановлено не полностью. Ручной `DROP TABLE`/`DROP SCHEMA` запрещён. Возврат к отсутствующей table выполняется только через согласованный с Supabase Support способ либо восстановление проверенного backup по отдельному решению владельца. До такого решения состояние обозначается как частично reconciled/rolled back, а не как pre-state.
 
 ### Restore rollback
 
@@ -349,13 +363,13 @@ STOP между versions, если:
 - возникает prompt, ошибка permission/lock/network, timeout или неожиданный SQL;
 - dry-run после `0800` показывает pending migration.
 
-После STOP нельзя «дожимать» оставшиеся versions. Сначала rollback к pre-state, incident note и новое ручное решение.
+После STOP нельзя «дожимать» оставшиеся versions. Сначала удалить только безопасно подтверждённые history records, зафиксировать фактическое состояние, оформить incident note и получить новое ручное решение. Полный возврат к pre-state нельзя заявлять, если изначально отсутствовавшая history table осталась после repair.
 
 ## 13. Критерии успешного завершения
 
 Reconciliation считается завершённой только когда:
 
-- remote history содержит ровно `202607120600`, `202607120700`, `202607120800` в ожидаемом порядке;
+- `supabase_migrations.schema_migrations` существует, её structure соответствует успешно rehearsed CLI bootstrap и она содержит ровно `202607120600`, `202607120700`, `202607120800` в ожидаемом порядке;
 - Atlas Manifest A до/после идентичен;
 - operational aggregates не изменились при frozen writes;
 - pending-migration dry-run пуст;
