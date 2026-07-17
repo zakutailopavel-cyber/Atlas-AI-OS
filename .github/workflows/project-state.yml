@@ -1,20 +1,10 @@
 name: Project state
 
 on:
-  pull_request:
-    paths:
-      - docs/PROJECT_STATE.md
-      - scripts/check-project-state.mjs
-      - package.json
-      - .github/workflows/project-state.yml
+  pull_request: {}
   push:
     branches:
       - main
-    paths:
-      - docs/PROJECT_STATE.md
-      - scripts/check-project-state.mjs
-      - package.json
-      - .github/workflows/project-state.yml
 
 permissions:
   contents: read
