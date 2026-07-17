@@ -119,7 +119,7 @@ The rehearsal script creates a disposable copy of `supabase/config.toml` and onl
 - `202607120700`;
 - `202607120800`.
 
-It records an Atlas schema manifest hash before and after repair and fails if the hash changes. After repair it copies `202607170900_tenant_foundation.sql` into the disposable migration directory and requires `supabase db push --local --dry-run` to show `202607170900` pending while `public.workspaces` and `public.workspace_members` remain absent. This proves the rehearsal does not apply `0900` and does not alter Atlas schema while bootstrapping history.
+It records an Atlas schema manifest hash before and after repair and fails if the hash changes. After repair it copies `202607170900_tenant_foundation.sql` into the disposable migration directory and requires `supabase db push --local --dry-run` to show exactly `202607170900_tenant_foundation.sql` pending while `public.workspaces` and `public.workspace_members` remain absent. Zero pending migrations is a STOP condition because `0900` may have been accidentally registered, applied, or excluded from the check. Any pending migration other than `0900` is also a STOP condition. This proves the rehearsal does not apply or mark `0900` as applied and does not alter Atlas schema while bootstrapping history.
 
 Confirmed GitHub Actions rehearsal run `29614156122` passed with Atlas schema hash `f6671afc61a6441dc0be4c793070a4e1e84f0ea5da3127f572ecfa1e88469bee` before and after repair. The resulting history contained exactly `202607120600`, `202607120700`, and `202607120800`; `202607170900` remained pending; production and Supabase Cloud were not connected.
 
@@ -240,7 +240,7 @@ Limitations: this is a local Supabase/PostgreSQL rehearsal, not a production or 
 
 - Manifest A до и после repair должен быть byte-equivalent после normalization.
 - Manifest B должен быть идентичен при остановленных writes.
-- History Manifest изменяется только по подтверждённому rehearsal-сценарию: при необходимости CLI создаёт history schema/table, затем versions последовательно становятся `0600`, `0600+0700`, `0600+0700+0800`.
+- History Manifest изменяется только по подтверждённому rehearsal-сценарию: при необходимости CLI создаёт history schema/table, затем versions последовательно становятся `0600`, `0600+0700`, `0600+0700+0800`; version `202607170900` не добавляется и остаётся pending.
 - Если history table существовала до repair, её structure должна остаться идентичной; меняется только ожидаемый набор versions.
 - Любое другое изменение означает STOP и rollback/incident review.
 
@@ -255,7 +255,7 @@ Rehearsal обязателен и выполняется только после
 5. Закрепить CLI `2.109.1` и repository commit.
 6. Выполнить кандидатный repair последовательно: `0600`, verify; `0700`, verify; `0800`, verify.
 7. После каждого шага сравнить History Manifest, Manifest A/B и history versions.
-8. После `0800` выполнить только dry-run pending-migration check: ожидается ноль migrations к применению.
+8. После `0800` выполнить только dry-run pending-migration check: ожидается ровно `202607170900_tenant_foundation.sql` как pending. Ноль pending migrations означает STOP, потому что `0900` могла быть ошибочно зарегистрирована, применена или исключена из проверки. Любая pending migration, кроме `0900`, также означает STOP.
 9. Выполнить обычные Auth/runtime smoke checks без Modal GPU, OpenAI API и новых Storage uploads.
 10. Проверить удаление history records в reverse order на отдельной disposable копии, зафиксировать оставшееся состояние history schema/table, затем повторить forward rehearsal. Это не считается полным возвратом к pre-state, если history table изначально отсутствовала.
 
@@ -295,7 +295,7 @@ Rehearsal обязателен и выполняется только после
 2. Не исполнять ALTER/policies migration `0800`.
 3. Подтвердить history set `{202607120600, 202607120700, 202607120800}`.
 4. Повторить History Manifest и Manifest A/B comparison.
-5. Проверить, что dry-run не предлагает ни одну repository migration.
+5. Проверить, что dry-run предлагает ровно `202607170900_tenant_foundation.sql` как pending. Ноль pending migrations или любая pending migration, кроме `0900`, означает STOP. `0900` запрещено применять или отмечать applied в рамках Issue #59.
 
 ### Phase 4 — закрытие
 
@@ -321,7 +321,7 @@ supabase migration repair 202607120600 --status applied --linked
 supabase migration repair 202607120700 --status applied --linked
 supabase migration repair 202607120800 --status applied --linked
 
-# ЗАПРЕЩЕНО СЕЙЧАС: допустимо только как post-repair dry-run после staging proof.
+# ЗАПРЕЩЕНО СЕЙЧАС: допустимо только как post-repair dry-run после staging proof; ожидает ровно 0900 pending.
 supabase db push --linked --dry-run
 ```
 
@@ -400,7 +400,7 @@ STOP между versions, если:
 - Manifest B изменился при frozen writes;
 - CLI предлагает исполнить migration вместо history-only repair;
 - возникает prompt, ошибка permission/lock/network, timeout или неожиданный SQL;
-- dry-run после `0800` показывает pending migration.
+- dry-run после `0800` не показывает ровно `202607170900_tenant_foundation.sql` как единственную pending migration: ноль pending migrations или любая pending migration, кроме `0900`, означает STOP.
 
 После STOP нельзя «дожимать» оставшиеся versions. Сначала удалить только безопасно подтверждённые history records, зафиксировать фактическое состояние, оформить incident note и получить новое ручное решение. Полный возврат к pre-state нельзя заявлять, если изначально отсутствовавшая history table осталась после repair.
 
@@ -411,10 +411,10 @@ Reconciliation считается завершённой только когда
 - `supabase_migrations.schema_migrations` существует, её structure соответствует успешно rehearsed CLI bootstrap и она содержит ровно `202607120600`, `202607120700`, `202607120800` в ожидаемом порядке;
 - Atlas Manifest A до/после идентичен;
 - operational aggregates не изменились при frozen writes;
-- pending-migration dry-run пуст;
+- pending-migration dry-run показывает ровно `202607170900_tenant_foundation.sql` как единственную pending migration;
 - Auth/runtime smoke checks успешны;
 - temporary access отозван;
 - владелец Atlas дал G6;
 - обезличенный отчёт сохранён, а production secrets и row contents — нет.
 
-Только после этого можно создавать отдельную additive migration для nullable `asset_url`/`review_comment`. Owner/workspace, RLS cutover, revisions и approval остаются отдельными последующими задачами.
+`0900` остаётся отдельной pending migration и не применяется/не отмечается applied в рамках Issue #59. Только после этого можно создавать отдельную additive migration для nullable `asset_url`/`review_comment`. Owner/workspace, RLS cutover, revisions и approval остаются отдельными последующими задачами.
