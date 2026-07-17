@@ -1,0 +1,39 @@
+name: Migration history bootstrap rehearsal
+
+on:
+  pull_request:
+    paths:
+      - "supabase/migrations/**"
+      - "supabase/config.toml"
+      - "scripts/rehearse-migration-history-bootstrap.sh"
+      - ".github/workflows/migration-history-rehearsal.yml"
+      - "docs/architecture/PRODUCTION_MIGRATION_RECONCILIATION.md"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: migration-history-rehearsal-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  rehearse-history-bootstrap:
+    name: Rehearse local history bootstrap
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install pinned Supabase CLI
+        uses: supabase/setup-cli@v2.1.1
+        with:
+          version: 2.109.1
+
+      - name: Install PostgreSQL client
+        run: sudo apt-get update && sudo apt-get install --yes postgresql-client rsync
+
+      - name: Rehearse missing history bootstrap in isolated local Supabase
+        run: scripts/rehearse-migration-history-bootstrap.sh

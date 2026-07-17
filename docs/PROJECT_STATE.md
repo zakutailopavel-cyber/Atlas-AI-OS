@@ -49,7 +49,7 @@
 | 02 — Сцены и референсы | Modal, IP-Adapter/InstantID, сцены, улучшение, кэш | Подготовлен reference-first контракт: versioned источники, metadata, лицензии, change regions, подбор, дедупликация и QA лица/сцены | Согласовать целевую схему и реализовать ingest + cache preflight без GPU |
 | 03 — Контент-фабрика | Публикации, тексты, изображения, материалы, календарь | Подготовлен контракт Content Pipeline v1: единый lifecycle, ручной approval, межобластные payload и idempotency генерации/публикации | Согласовать статусы и реализовать server-side revisions + approval gate без изменения UI |
 | 04 — Интерфейс Atlas | Дизайн, адаптивность, модальные окна, карточки | Подготовлен контракт UI Modules v1: feature-границы, props, единые actions/modal, три status-слоя, approval gate и безопасная декомпозиция без редизайна | Начать с baseline screenshots и механического извлечения типов + UI primitives |
-| 05 — Backend и инфраструктура | Supabase, Storage, RLS, Vercel, Modal, auth, расходы | В `main` зафиксированы schema equivalence evidence и слитая additive tenant foundation `0900` из PR #49; backfill, canary/RLS cutover и production repair остаются отдельными ручными этапами | Следующий gate — отдельный ручной план backfill, canary/RLS cutover и production repair без автоматического production-доступа |
+| 05 — Backend и инфраструктура | Supabase, Storage, RLS, Vercel, Modal, auth, расходы | Issue #56 готовит изолированный local/GitHub Actions rehearsal для bootstrap отсутствующей migration history `0600 → 0800`; production/Supabase Cloud не подключались, `0900` остаётся pending | Дождаться проверки draft PR #56 rehearsal workflow, затем отдельно решать ручные gates production reconciliation |
 
 ## Открытые PR и решения
 
@@ -57,7 +57,7 @@
 - PR #51 слит в `main`: добавлены Atlas issue/PR templates и workflow проверки PROJECT_STATE.md.
 - PR #50 закрыт без merge.
 - PR #44, #45, #46, #47, #49, #51 и #53 слиты в `main`; актуальный подтверждённый `main` — `5a0988b`.
-- На момент проверки Issue #54 открытых PR нет; пересечений файлов нет.
+- На момент проверки Issue #56 GitHub API вернул 0 открытых PR; пересечений файлов нет.
 - Read-only проверка GitHub ruleset `Protect main` 2026-07-17 подтвердила `active` enforcement для default branch, обязательный PR, запрет branch deletion/non-fast-forward и required status checks `build` + `check-project-state`.
 - Каждый новый PR должен быть узким и относиться к одной области. Межобластные изменения сначала согласуются в области 00.
 
@@ -96,6 +96,7 @@
 
 | Дата | Область | Состояние | Изменение | PR/коммит |
 | --- | --- | --- | --- | --- |
+| 2026-07-17 | 05 | В работе | Issue #56 добавляет изолированный rehearsal bootstrap migration history: local Supabase без production/Cloud, supported `migration repair --local` для `0600`, `0700`, `0800`, hash-сравнение Atlas schema и dry-run pending `0900` | draft PR |
 | 2026-07-17 | 00 | В работе | Issue #54 фиксирует слитый PR #53 и active ruleset `Protect main`: обязательный PR, запрет удаления/force push и required checks `build` + `check-project-state`; подтверждённый `main` — `5a0988b`, открытых PR нет | draft PR |
 | 2026-07-17 | 00 | Завершено | PR #53 слит: Project state workflow запускается на каждом PR; GitHub ruleset `Protect main` настроен вручную без изменений из этого PR | PR #53 / `5a0988b` |
 | 2026-07-17 | 05 | Завершено | PR #49 слит: additive tenant foundation `0900` вошла в `main`; без backfill, runtime/UI, production cutover и production-доступа | PR #49 / `792c35d` |
@@ -110,7 +111,6 @@
 | 2026-07-16 | 05 | В работе | Прослежен lifecycle `asset_url`/`review_comment` и зафиксирован безопасный порядок устранения runtime/schema drift без изменения production | draft PR |
 | 2026-07-16 | 05 | В работе | Зафиксирован обезличенный read-only inventory production Supabase и расхождения со схемой, migrations и data contract | draft PR |
 | 2026-07-15 | 00 | В работе | Зафиксировано назначение Atlas как внутренней многопользовательской фабрики для роста и монетизации аудитории, не SaaS | draft PR |
-| 2026-07-14 | 05 | В работе | Согласована минимальная физическая модель данных и безопасный порядок будущих migrations без изменения production | draft PR |
 
 ## Шаблон передачи состояния после работы
 

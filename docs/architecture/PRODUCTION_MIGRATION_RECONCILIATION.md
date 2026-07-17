@@ -108,6 +108,21 @@ Confirmed facts:
 
 This evidence confirms schema equivalence only; it does not authorize production migration-history reconciliation. Production repair remains prohibited. The next gate is a separate rehearsal that bootstraps the missing migration history without connecting to production.
 
+
+### 3.5. Isolated history-bootstrap rehearsal workflow
+
+Issue #56 adds a repository workflow for the next gate without authorizing production access. The workflow `migration-history-rehearsal.yml` runs only in an ephemeral GitHub Actions/local Supabase runner with Supabase CLI `2.109.1`; it does not use `supabase link`, `--linked`, repository secrets, production credentials, remote database URLs, OpenAI API, Modal GPU, or social publishing.
+
+The rehearsal script creates a disposable copy of `supabase/config.toml` and only migrations `0600 → 0700 → 0800`, starts local Supabase, removes only the local `supabase_migrations` schema to reproduce the missing-history pre-state, and then uses supported local CLI commands `supabase migration repair ... --status applied --local` for exactly:
+
+- `202607120600`;
+- `202607120700`;
+- `202607120800`.
+
+It records an Atlas schema manifest hash before and after repair and fails if the hash changes. After repair it copies `202607170900_tenant_foundation.sql` into the disposable migration directory and requires `supabase db push --local --dry-run` to show `202607170900` pending while `public.workspaces` and `public.workspace_members` remain absent. This proves the rehearsal does not apply `0900` and does not alter Atlas schema while bootstrapping history.
+
+Limitations: this is a local Supabase/PostgreSQL rehearsal, not a production or staging clone. It proves the supported CLI path and expected invariants in an isolated runner, but production reconciliation remains forbidden until all manual gates in this runbook are completed.
+
 ## 4. Что известно и не известно о production migration history
 
 ### Известно
