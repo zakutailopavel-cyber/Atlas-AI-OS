@@ -5,7 +5,7 @@ on:
     paths:
       - ".github/workflows/supabase-reconciliation-diagnostic.yml"
       - "production-reconciliation-preflight.sql"
-      - "supabase/tests/diagnostics/reconciliation-object-names.sql"
+      - ".github/diagnostics/reconciliation-object-names.sql"
   workflow_dispatch:
 
 permissions:
@@ -71,7 +71,7 @@ jobs:
           echo "classification|object_type|schema|object_name"
           docker exec -i supabase_db_atlas-ai-os-migration-ci \
             psql -U postgres -d postgres -qAt -F '|' -v ON_ERROR_STOP=1 \
-            < supabase/tests/diagnostics/reconciliation-object-names.sql
+            < .github/diagnostics/reconciliation-object-names.sql
 
       - name: Compare Manifest A component hashes
         shell: bash
