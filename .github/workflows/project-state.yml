@@ -1,0 +1,33 @@
+name: Project state
+
+on:
+  pull_request:
+    paths:
+      - docs/PROJECT_STATE.md
+      - scripts/check-project-state.mjs
+      - package.json
+      - .github/workflows/project-state.yml
+  push:
+    branches:
+      - main
+    paths:
+      - docs/PROJECT_STATE.md
+      - scripts/check-project-state.mjs
+      - package.json
+      - .github/workflows/project-state.yml
+
+permissions:
+  contents: read
+
+jobs:
+  check-project-state:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Check PROJECT_STATE.md
+        run: node scripts/check-project-state.mjs
