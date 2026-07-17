@@ -1,0 +1,94 @@
+name: Atlas task
+description: Scoped Atlas AI OS task for areas 00-05
+title: "[area XX] <short task>"
+labels: ["atlas-task"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this template for Atlas work only. Keep the scope narrow, respect manual production/GPU/publishing gates, and do not treat unmerged PRs as `main` state.
+  - type: dropdown
+    id: area
+    attributes:
+      label: Atlas area
+      description: Select exactly one owning area.
+      options:
+        - "00 — Coordinator: architecture, roadmap, PR control"
+        - "01 — AI models and Character Brain"
+        - "02 — Scenes, references, Modal, cache"
+        - "03 — Content factory, lifecycle, publishing, analytics"
+        - "04 — Interface, responsiveness, UI modules"
+        - "05 — Supabase, Storage, RLS, Vercel, auth, infrastructure"
+    validations:
+      required: true
+  - type: input
+    id: confirmed-main
+    attributes:
+      label: Confirmed main SHA
+      description: Short SHA from the current `main` used as the base for this task.
+      placeholder: "792c35d"
+    validations:
+      required: true
+  - type: textarea
+    id: goal
+    attributes:
+      label: Goal
+      description: One concise outcome for this task.
+    validations:
+      required: true
+  - type: textarea
+    id: scope
+    attributes:
+      label: Allowed scope and files
+      description: List files or directories that may be changed.
+      placeholder: |
+        Allowed:
+        - .github/ISSUE_TEMPLATE/atlas_task.yml
+        Not allowed:
+        - Supabase migrations
+        - runtime/UI
+        - production writes
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: Required context checked
+      value: |
+        - [ ] Current `main` SHA checked
+        - [ ] Open PRs checked for file overlap
+        - [ ] `docs/PROJECT_STATE.md` read
+        - [ ] Relevant `docs/architecture/` contracts read
+        - [ ] Narrow task scope confirmed
+    validations:
+      required: true
+  - type: textarea
+    id: checks
+    attributes:
+      label: Required checks
+      value: |
+        - [ ] npm ci
+        - [ ] npm run build
+        - [ ] npm run check:project-state
+        - [ ] git diff --check
+        - [ ] git status --short reviewed
+    validations:
+      required: true
+  - type: textarea
+    id: gates
+    attributes:
+      label: Manual gates and costs
+      value: |
+        Production/Supabase writes: forbidden unless separately approved.
+        OpenAI/Modal GPU: not planned.
+        Social publishing: not planned.
+        Expected API/GPU cost: none.
+    validations:
+      required: true
+  - type: textarea
+    id: risks
+    attributes:
+      label: Risks and next safe step
+      description: Summarize risks, rollback path, and the next safe step after review.
+    validations:
+      required: true
