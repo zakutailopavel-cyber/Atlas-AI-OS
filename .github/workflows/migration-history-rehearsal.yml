@@ -1,0 +1,40 @@
+name: Migration history bootstrap rehearsal
+
+on:
+  pull_request:
+    paths:
+      - "scripts/rehearse-migration-history-bootstrap.sh"
+      - ".github/workflows/migration-history-rehearsal.yml"
+      - "supabase/migrations/202607120600_core_schema_baseline.sql"
+      - "supabase/migrations/202607120700_avatar_generation.sql"
+      - "supabase/migrations/202607120800_character_scenes.sql"
+      - "supabase/migrations/202607170900_tenant_foundation.sql"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: migration-history-rehearsal-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  rehearse-history-bootstrap:
+    name: Rehearse local history bootstrap
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install pinned Supabase CLI
+        uses: supabase/setup-cli@v2.1.1
+        with:
+          version: 2.109.1
+
+      - name: Install PostgreSQL client
+        run: sudo apt-get update && sudo apt-get install --yes postgresql-client
+
+      - name: Rehearse missing history bootstrap in isolated local Supabase
+        run: scripts/rehearse-migration-history-bootstrap.sh

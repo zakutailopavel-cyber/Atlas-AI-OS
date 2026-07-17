@@ -8,7 +8,7 @@
 - Production: https://atlas.epkoolitus.ee
 - Основной стек: Next.js 16, React 19, TypeScript, Supabase, Vercel, Modal GPU, OpenAI API.
 - Основная ветка: `main`.
-- Подтверждённый снимок `main`: `5a0988b` от 2026-07-17 — слит PR #53, Project state запускается на каждом PR; read-only проверка GitHub ruleset `Protect main` показала active enforcement для default branch, обязательный PR, запрет удаления/force push и required status checks `build` + `check-project-state`; открытых PR на момент проверки Issue #54 нет; production не подключался и не изменялся.
+- Подтверждённый снимок `main`: `b4c665a` от 2026-07-17 — слит PR #55, защита `main` зафиксирована активной; draft PR #57 открыт для Issue #56 migration-history rehearsal; production не подключался и не изменялся.
 - Production на момент проверки 2026-07-13 отвечает и перенаправляет неавторизованного пользователя на `/login`.
 
 ## Как пользоваться этим файлом
@@ -44,20 +44,20 @@
 
 | Область | Ответственность | Текущее состояние | Ближайший фокус |
 | --- | --- | --- | --- |
-| 00 — Координатор | Архитектура, приоритеты, roadmap, контроль PR | Общая память актуализирована по подтверждённому `main` `5a0988b`; открытых PR на момент проверки Issue #54 нет; GitHub ruleset `Protect main` активен для default branch и требует PR + status checks `build` и `check-project-state`, с запретом удаления и force push | Дождаться прохождения обязательных checks на PR Issue #54 и затем оставить merge ручным действием владельца |
+| 00 — Координатор | Архитектура, приоритеты, roadmap, контроль PR | Общая память актуализирована по подтверждённому `main` `b4c665a`; для Issue #56 открыт draft PR #57; GitHub Actions rehearsal run `29614156122` подтвердил history bootstrap без production/Supabase Cloud | Review draft PR #57, merge оставить ручным действием владельца/координатора |
 | 01 — AI-модели и Character Brain | Профили, внешность, seed, эталонное лицо, память | Подготовлен контракт Character Brain v1: обязательные поля, immutable facts, versioned memory, visual identity, voice и минимальные payload | Реализовать server-side legacy adapter без изменения данных |
 | 02 — Сцены и референсы | Modal, IP-Adapter/InstantID, сцены, улучшение, кэш | Подготовлен reference-first контракт: versioned источники, metadata, лицензии, change regions, подбор, дедупликация и QA лица/сцены | Согласовать целевую схему и реализовать ingest + cache preflight без GPU |
 | 03 — Контент-фабрика | Публикации, тексты, изображения, материалы, календарь | Подготовлен контракт Content Pipeline v1: единый lifecycle, ручной approval, межобластные payload и idempotency генерации/публикации | Согласовать статусы и реализовать server-side revisions + approval gate без изменения UI |
 | 04 — Интерфейс Atlas | Дизайн, адаптивность, модальные окна, карточки | Подготовлен контракт UI Modules v1: feature-границы, props, единые actions/modal, три status-слоя, approval gate и безопасная декомпозиция без редизайна | Начать с baseline screenshots и механического извлечения типов + UI primitives |
-| 05 — Backend и инфраструктура | Supabase, Storage, RLS, Vercel, Modal, auth, расходы | В `main` зафиксированы schema equivalence evidence и слитая additive tenant foundation `0900` из PR #49; backfill, canary/RLS cutover и production repair остаются отдельными ручными этапами | Следующий gate — отдельный ручной план backfill, canary/RLS cutover и production repair без автоматического production-доступа |
+| 05 — Backend и инфраструктура | Supabase, Storage, RLS, Vercel, Modal, auth, расходы | Issue #56 draft PR #57 подтвердил isolated GitHub Actions rehearsal run `29614156122`: schema hash до/после `f6671afc61a6441dc0be4c793070a4e1e84f0ea5da3127f572ecfa1e88469bee`, history ровно `0600`, `0700`, `0800`, `0900` pending, production/Supabase Cloud не подключались | Review draft PR #57; production reconciliation остаётся за отдельными ручными gates |
 
 ## Открытые PR и решения
 
 - PR #53 слит в `main`: Project state workflow запускается на каждом PR.
 - PR #51 слит в `main`: добавлены Atlas issue/PR templates и workflow проверки PROJECT_STATE.md.
 - PR #50 закрыт без merge.
-- PR #44, #45, #46, #47, #49, #51 и #53 слиты в `main`; актуальный подтверждённый `main` — `5a0988b`.
-- На момент проверки Issue #54 открытых PR нет; пересечений файлов нет.
+- PR #44, #45, #46, #47, #49, #51, #53 и #55 слиты в `main`; актуальный подтверждённый `main` — `b4c665a`.
+- Для Issue #56 открыт реальный draft PR #57; перед его созданием GitHub API вернул 0 других открытых PR, пересечений файлов не было.
 - Read-only проверка GitHub ruleset `Protect main` 2026-07-17 подтвердила `active` enforcement для default branch, обязательный PR, запрет branch deletion/non-fast-forward и required status checks `build` + `check-project-state`.
 - Каждый новый PR должен быть узким и относиться к одной области. Межобластные изменения сначала согласуются в области 00.
 
@@ -76,7 +76,7 @@
 
 ## Текущие приоритеты
 
-1. P0: дождаться, что обязательные checks `build` и `check-project-state` успешно пройдут на PR Issue #54 под активным ruleset `Protect main`, затем оставить merge ручным действием владельца.
+1. P0: review draft PR #57 с подтверждённым isolated rehearsal run `29614156122`; merge оставить ручным действием владельца/координатора.
 2. P0: подготовить безопасный план production migration-history reconciliation без исполнения clean-only baseline на существующей базе.
 3. P0: определить реалистичный lint baseline и добавить отдельную проверку без скрытия ошибок или отключения правил.
 4. P1: после reconciliation добавить nullable legacy bridge-поля `asset_url` и `review_comment` отдельной additive migration и исправить runtime error handling.
@@ -96,7 +96,8 @@
 
 | Дата | Область | Состояние | Изменение | PR/коммит |
 | --- | --- | --- | --- | --- |
-| 2026-07-17 | 00 | В работе | Issue #54 фиксирует слитый PR #53 и active ruleset `Protect main`: обязательный PR, запрет удаления/force push и required checks `build` + `check-project-state`; подтверждённый `main` — `5a0988b`, открытых PR нет | draft PR |
+| 2026-07-17 | 05 | В работе | Draft PR #57: GitHub Actions rehearsal run `29614156122` подтвердил hash до/после `f6671afc61a6441dc0be4c793070a4e1e84f0ea5da3127f572ecfa1e88469bee`, history ровно `0600`, `0700`, `0800`, `0900` pending; production/Supabase Cloud не подключались | draft PR #57 |
+| 2026-07-17 | 00 | Завершено | PR #55 слит: подтверждённый `main` — `b4c665a`, активная защита `main` зафиксирована; следующий текущий review — draft PR #57 для Issue #56 | PR #55 / `b4c665a` |
 | 2026-07-17 | 00 | Завершено | PR #53 слит: Project state workflow запускается на каждом PR; GitHub ruleset `Protect main` настроен вручную без изменений из этого PR | PR #53 / `5a0988b` |
 | 2026-07-17 | 05 | Завершено | PR #49 слит: additive tenant foundation `0900` вошла в `main`; без backfill, runtime/UI, production cutover и production-доступа | PR #49 / `792c35d` |
 | 2026-07-17 | 00 | Завершено | Подтверждён `main` `0022900`: PR #47 слит после PR #44–#46; открыт draft PR #49, его изменения не считаются состоянием `main` | PR #47 / `0022900` |
@@ -110,7 +111,6 @@
 | 2026-07-16 | 05 | В работе | Прослежен lifecycle `asset_url`/`review_comment` и зафиксирован безопасный порядок устранения runtime/schema drift без изменения production | draft PR |
 | 2026-07-16 | 05 | В работе | Зафиксирован обезличенный read-only inventory production Supabase и расхождения со схемой, migrations и data contract | draft PR |
 | 2026-07-15 | 00 | В работе | Зафиксировано назначение Atlas как внутренней многопользовательской фабрики для роста и монетизации аудитории, не SaaS | draft PR |
-| 2026-07-14 | 05 | В работе | Согласована минимальная физическая модель данных и безопасный порядок будущих migrations без изменения production | draft PR |
 
 ## Шаблон передачи состояния после работы
 
