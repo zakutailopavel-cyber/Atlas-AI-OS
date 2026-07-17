@@ -8,7 +8,7 @@
 - Production: https://atlas.epkoolitus.ee
 - Основной стек: Next.js 16, React 19, TypeScript, Supabase, Vercel, Modal GPU, OpenAI API.
 - Основная ветка: `main`.
-- Подтверждённый снимок `main`: `833c461` от 2026-07-17 — подтверждённая schema equivalence production snapshot и clean migration chain без изменения production.
+- Подтверждённый снимок `main`: `7f107b5` от 2026-07-17 — слиты PR #44–#46: локальные Geist-шрифты для воспроизводимой сборки, evidence schema equivalence и корневая инструкция `AGENTS.md`; production не подключался и не изменялся.
 - Production на момент проверки 2026-07-13 отвечает и перенаправляет неавторизованного пользователя на `/login`.
 
 ## Как пользоваться этим файлом
@@ -44,16 +44,17 @@
 
 | Область | Ответственность | Текущее состояние | Ближайший фокус |
 | --- | --- | --- | --- |
-| 00 — Координатор | Архитектура, приоритеты, roadmap, контроль PR | Общая память актуализирована по подтверждённому `main` `833c461`; подготовлена корневая постоянная инструкция `AGENTS.md` для всех Codex-задач | Контроль безопасного плана production migration-history reconciliation и актуального roadmap |
+| 00 — Координатор | Архитектура, приоритеты, roadmap, контроль PR | Общая память актуализирована по подтверждённому `main` `7f107b5`; PR #44–#46 слиты, открытых PR нет | Контроль безопасного плана production migration-history reconciliation и актуального roadmap |
 | 01 — AI-модели и Character Brain | Профили, внешность, seed, эталонное лицо, память | Подготовлен контракт Character Brain v1: обязательные поля, immutable facts, versioned memory, visual identity, voice и минимальные payload | Реализовать server-side legacy adapter без изменения данных |
 | 02 — Сцены и референсы | Modal, IP-Adapter/InstantID, сцены, улучшение, кэш | Подготовлен reference-first контракт: versioned источники, metadata, лицензии, change regions, подбор, дедупликация и QA лица/сцены | Согласовать целевую схему и реализовать ingest + cache preflight без GPU |
 | 03 — Контент-фабрика | Публикации, тексты, изображения, материалы, календарь | Подготовлен контракт Content Pipeline v1: единый lifecycle, ручной approval, межобластные payload и idempotency генерации/публикации | Согласовать статусы и реализовать server-side revisions + approval gate без изменения UI |
 | 04 — Интерфейс Atlas | Дизайн, адаптивность, модальные окна, карточки | Подготовлен контракт UI Modules v1: feature-границы, props, единые actions/modal, три status-слоя, approval gate и безопасная декомпозиция без редизайна | Начать с baseline screenshots и механического извлечения типов + UI primitives |
-| 05 — Backend и инфраструктура | Supabase, Storage, RLS, Vercel, Modal, auth, расходы | Зафиксировано доказательство schema equivalence: diagnostic run `29589401343`, clean chain `0600 → 0700 → 0800`, 16 pgTAP checks, совпадение 8 component hashes и overall hash `667f8e50aa43b29e9accc2928b03aafa`; production не подключался и не изменялся | Следующий gate — отдельный rehearsal bootstrap отсутствующей migration history без подключения к production; production repair запрещён |
+| 05 — Backend и инфраструктура | Supabase, Storage, RLS, Vercel, Modal, auth, расходы | Подготовлена additive tenant foundation migration `0900`: `workspaces`, `workspace_members`, nullable `content_items.owner_id`, auth.uid()-based membership helpers, RLS для новых таблиц и pgTAP coverage; nullable bridge ещё не обеспечивает tenant-изоляцию, backfill/RLS cutover отдельно; production не подключался и не изменялся | Следующий gate — прогнать isolated migration CI/pgTAP и затем отдельный ручной backfill + canary/RLS cutover plan без production repair |
 
 ## Открытые PR и решения
 
-- До текущего draft PR открытых PR не было.
+- Открытых PR нет на момент проверки 2026-07-17.
+- PR #44, #45 и #46 слиты в `main`; актуальный подтверждённый `main` — `7f107b5`.
 - Каждый новый PR должен быть узким и относиться к одной области. Межобластные изменения сначала согласуются в области 00.
 
 ## Известные риски и технический долг
@@ -90,9 +91,11 @@
 
 | Дата | Область | Состояние | Изменение | PR/коммит |
 | --- | --- | --- | --- | --- |
-| 2026-07-17 | 00 | В работе | Добавлена корневая инструкция для агентов: обязательный контекст, границы областей, проверки, draft PR и ручные production/GPU/merge gates | draft PR |
-| 2026-07-17 | 05 | В работе | Зафиксировано evidence schema equivalence: PR #43 закрыт без merge, diagnostic run `29589401343` успешен, clean chain и production/local hashes совпали; следующий gate — rehearsal bootstrap history без production | draft PR |
-| 2026-07-17 | 00 | В работе | Geist Sans и Geist Mono переведены с build-time Google Fonts на локальный пакет того же шрифта для воспроизводимой сборки Codex Cloud | draft PR |
+| 2026-07-17 | 05 | В работе | Подготовлена additive tenant foundation `0900`: workspace tables, nullable `content_items.owner_id`, membership helpers через `auth.uid()`, RLS новых таблиц и pgTAP; без backfill, runtime/UI и production cutover | draft PR |
+| 2026-07-17 | 00 | В работе | Подтверждён актуальный `main` `7f107b5`: PR #44–#46 слиты, открытых PR нет; общая память обновлена без изменений production, Supabase, runtime, UI, OpenAI и Modal | draft PR |
+| 2026-07-17 | 00 | Завершено | Добавлена корневая инструкция для агентов: обязательный контекст, границы областей, проверки, draft PR и ручные production/GPU/merge gates | PR #46 / `7f107b5` |
+| 2026-07-17 | 05 | Завершено | Зафиксировано evidence schema equivalence: PR #43 закрыт без merge, diagnostic run `29589401343` успешен, clean chain и production/local hashes совпали; следующий gate — rehearsal bootstrap history без production | PR #45 / `833c461` |
+| 2026-07-17 | 00 | Завершено | Geist Sans и Geist Mono переведены с build-time Google Fonts на локальный пакет того же шрифта для воспроизводимой сборки Codex Cloud | PR #44 |
 | 2026-07-17 | 05 | В работе | Подготовлен gated runbook reconciliation migration history с read-only preflight, staging, backup, rollback и ручными разрешениями без изменения production | draft PR |
 | 2026-07-17 | 00 | В работе | Общая память синхронизирована с `main` `4434803`; закрытые P0 удалены, следующий этап — безопасный migration-history reconciliation | draft PR |
 | 2026-07-17 | 05 | В работе | Добавлена изолированная CI-проверка полного Supabase migration chain, Atlas schema/RLS/policies и отсутствия будущих полей без подключения к production | draft PR |
@@ -103,8 +106,6 @@
 | 2026-07-14 | 05 | В работе | Согласована минимальная физическая модель данных и безопасный порядок будущих migrations без изменения production | draft PR |
 | 2026-07-14 | 04 | В работе | Зафиксирован план декомпозиции интерфейса по модулям без изменения дизайна и runtime | draft PR |
 | 2026-07-14 | 03 | В работе | Зафиксирован единый жизненный цикл публикации от идеи до аналитики без изменения runtime | draft PR |
-| 2026-07-14 | 02 | В работе | Зафиксирован reference-first контракт библиотеки сцен без изменения runtime и схемы данных | draft PR |
-| 2026-07-14 | 01 | В работе | Зафиксирован архитектурный контракт Character Brain v1 без изменения runtime | draft PR |
 
 ## Шаблон передачи состояния после работы
 
