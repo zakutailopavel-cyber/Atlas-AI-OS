@@ -49,7 +49,7 @@
 | 02 — Сцены и референсы | Modal, IP-Adapter/InstantID, сцены, улучшение, кэш | Подготовлен reference-first контракт: versioned источники, metadata, лицензии, change regions, подбор, дедупликация и QA лица/сцены | Согласовать целевую схему и реализовать ingest + cache preflight без GPU |
 | 03 — Контент-фабрика | Публикации, тексты, изображения, материалы, календарь | Подготовлен контракт Content Pipeline v1: единый lifecycle, ручной approval, межобластные payload и idempotency генерации/публикации | Согласовать статусы и реализовать server-side revisions + approval gate без изменения UI |
 | 04 — Интерфейс Atlas | Дизайн, адаптивность, модальные окна, карточки | Подготовлен контракт UI Modules v1: feature-границы, props, единые actions/modal, три status-слоя, approval gate и безопасная декомпозиция без редизайна | Начать с baseline screenshots и механического извлечения типов + UI primitives |
-| 05 — Backend и инфраструктура | Supabase, Storage, RLS, Vercel, Modal, auth, расходы | Clean-environment baseline и отдельная CI-проверка полного migration chain `0600 → 0700 → 0800` успешно подтверждены в изолированной локальной Supabase без production secrets | Отдельно согласовать production migration-history reconciliation |
+| 05 — Backend и инфраструктура | Supabase, Storage, RLS, Vercel, Modal, auth, расходы | Подготовлен проверяемый runbook production migration-history reconciliation для `0600 → 0700 → 0800` без подключения и изменений production | После ручного разрешения выполнить повторный read-only preflight и staging rehearsal; production repair пока запрещён |
 
 ## Открытые PR и решения
 
@@ -90,6 +90,7 @@
 
 | Дата | Область | Состояние | Изменение | PR/коммит |
 | --- | --- | --- | --- | --- |
+| 2026-07-17 | 05 | В работе | Подготовлен gated runbook reconciliation migration history с read-only preflight, staging, backup, rollback и ручными разрешениями без изменения production | draft PR |
 | 2026-07-17 | 00 | В работе | Общая память синхронизирована с `main` `4434803`; закрытые P0 удалены, следующий этап — безопасный migration-history reconciliation | draft PR |
 | 2026-07-17 | 05 | В работе | Добавлена изолированная CI-проверка полного Supabase migration chain, Atlas schema/RLS/policies и отсутствия будущих полей без подключения к production | draft PR |
 | 2026-07-16 | 05 | В работе | Добавлен clean-only baseline core schema перед существующими migrations; production и migration history не изменялись | draft PR |
@@ -104,7 +105,6 @@
 | 2026-07-14 | 05 | В работе | Восстановлены корректный lockfile и CI-проверка `npm ci` + `npm run build` без GPU | draft PR |
 | 2026-07-14 | 00 | В работе | Добавлена единая память проекта и правила передачи состояния между чатами | draft PR |
 | 2026-07-13 | 02/04 | В `main` | Управление кадром и полноэкранный просмотр сцен | `5782424` / #28 |
-| 2026-07-13 | 02 | В `main` | Исправлен импорт img2img-пайплайна сцен | `959f3bb` / #27 |
 
 ## Шаблон передачи состояния после работы
 
