@@ -8,7 +8,7 @@
 - Production: https://atlas.epkoolitus.ee
 - Основной стек: Next.js 16, React 19, TypeScript, Supabase, Vercel, Modal GPU, OpenAI API.
 - Основная ветка: `main`.
-- Подтверждённый снимок `main`: `104bc59` от 2026-07-18 — PR #62 слит после 04-B-1; production, Supabase Cloud, UI/runtime, OpenAI и Modal не подключались и не изменялись.
+- Подтверждённый снимок `main`: `a23d425` от 2026-07-18 — PR #65 слит после 04-B-2; production, Supabase Cloud, OpenAI и Modal не подключались и не изменялись.
 - Production на момент проверки 2026-07-13 отвечает и перенаправляет неавторизованного пользователя на `/login`.
 
 ## Как пользоваться этим файлом
@@ -44,11 +44,11 @@
 
 | Область | Ответственность | Текущее состояние | Ближайший фокус |
 | --- | --- | --- | --- |
-| 00 — Координатор | Архитектура, приоритеты, roadmap, контроль PR | Общая память актуализирована по подтверждённому `main` `104bc59`; PR #60 и #62 merged, Issue #59 закрыт; production reconciliation остановлен из-за отсутствия backups/PITR на Supabase Free Plan | Координировать следующий безопасный этап 04-B: baseline screenshots и механическое извлечение типов/UI primitives без изменения DOM, CSS, runtime и production |
+| 00 — Координатор | Архитектура, приоритеты, roadmap, контроль PR | Общая память актуализирована по подтверждённому `main` `a23d425`; PR #64 и #65 merged, открытых PR нет; production reconciliation остановлен из-за отсутствия backups/PITR на Supabase Free Plan | Согласовать одну следующую узкую lint-задачу области 04 без редизайна и без изменения API/runtime/production |
 | 01 — AI-модели и Character Brain | Профили, внешность, seed, эталонное лицо, память | Подготовлен контракт Character Brain v1: обязательные поля, immutable facts, versioned memory, visual identity, voice и минимальные payload | Реализовать server-side legacy adapter без изменения данных |
 | 02 — Сцены и референсы | Modal, IP-Adapter/InstantID, сцены, улучшение, кэш | Подготовлен reference-first контракт: versioned источники, metadata, лицензии, change regions, подбор, дедупликация и QA лица/сцены | Согласовать целевую схему и реализовать ingest + cache preflight без GPU |
 | 03 — Контент-фабрика | Публикации, тексты, изображения, материалы, календарь | Подготовлен контракт Content Pipeline v1: единый lifecycle, ручной approval, межобластные payload и idempotency генерации/публикации | Согласовать статусы и реализовать server-side revisions + approval gate без изменения UI |
-| 04 — Интерфейс Atlas | Дизайн, адаптивность, модальные окна, карточки | 04-B-1 завершена; в 04-B-2 добавлены только осмысленные `alt` четырём существующим `<img>`, `jsx-a11y/alt-text` = 0; React keys, DOM/CSS/API/runtime не менялись | Проверить draft PR 04-B-2 и после ручного merge выбрать следующую изолированную категорию lint без редизайна |
+| 04 — Интерфейс Atlas | Дизайн, адаптивность, модальные окна, карточки | 04-B-1 и 04-B-2 завершены; PR #65 добавил только осмысленные `alt` четырём существующим `<img>`, `jsx-a11y/alt-text` = 0; React keys, DOM/CSS/API/runtime не менялись | Выбрать следующую изолированную категорию lint отдельной задачей без редизайна |
 | 05 — Backend и инфраструктура | Supabase, Storage, RLS, Vercel, Modal, auth, расходы | Issue #59 закрыт: production reconciliation остановлен, потому что Supabase Free Plan не предоставляет backups/PITR; production migration repair, `db push` и migration `0900` не выполнялись | Не выполнять production reconciliation без нового ручного gate и доступного backup/PITR; следующий технический этап передан области 04-B |
 
 ## Открытые PR и решения
@@ -56,7 +56,7 @@
 - PR #53 слит в `main`: Project state workflow запускается на каждом PR.
 - PR #51 слит в `main`: добавлены Atlas issue/PR templates и workflow проверки PROJECT_STATE.md.
 - PR #50 закрыт без merge.
-- PR #44, #45, #46, #47, #49, #51, #53, #55, #57, #58, #60 и #62 слиты в `main`; актуальный подтверждённый `main` — `104bc59`.
+- PR #44, #45, #46, #47, #49, #51, #53, #55, #57, #58, #60, #62, #64 и #65 слиты в `main`; актуальный подтверждённый `main` — `a23d425`.
 - Issue #56 выполнена и PR #57 слит; Issue #59 закрыт после PR #60: production reconciliation остановлен, потому что Supabase Free Plan не предоставляет backups/PITR.
 - Read-only проверка GitHub ruleset `Protect main` 2026-07-17 подтвердила `active` enforcement для default branch, обязательный PR, запрет branch deletion/non-fast-forward и required status checks `build` + `check-project-state`.
 - Каждый новый PR должен быть узким и относиться к одной области. Межобластные изменения сначала согласуются в области 00.
@@ -96,7 +96,7 @@
 
 | Дата | Область | Состояние | Изменение | PR/коммит |
 | --- | --- | --- | --- | --- |
-| 2026-07-18 | 04 | В работе | 04-B-2 добавила только осмысленные `alt` четырём существующим `<img>`; `jsx-a11y/alt-text` = 0, React keys, DOM/CSS/API/runtime, production, Supabase Cloud, OpenAI и Modal не менялись | draft PR |
+| 2026-07-18 | 04 | Завершено | PR #65 слит: 04-B-2 добавила только осмысленные `alt` четырём существующим `<img>`; `jsx-a11y/alt-text` = 0, React keys, DOM/CSS/API/runtime, production, Supabase Cloud, OpenAI и Modal не менялись | PR #65 / `a23d425` |
 | 2026-07-18 | 04 | Завершено | PR #62 слит: 04-B-1 механически добавила стабильные React keys для 13 JSX-итераций в `src/app/dashboard.tsx`; `react/jsx-key` = 0, DOM/CSS/API/runtime, production, OpenAI и Modal не менялись | PR #62 / `104bc59` |
 | 2026-07-18 | 00 | Завершено | PR #60 слит и Issue #59 закрыт: production reconciliation остановлен из-за отсутствия backups/PITR на Supabase Free Plan; production migration repair, `db push`, migration `0900`, production/Supabase Cloud, OpenAI и Modal не запускались; следующий безопасный этап — 04-B | PR #60 / `ebf2590` |
 | 2026-07-18 | 05 | Завершено | PR #57 слит: GitHub Actions rehearsal run `29614156122` подтвердил одинаковый schema hash до/после, history ровно `0600`, `0700`, `0800` и pending `0900`; production/Supabase Cloud не подключались | PR #57 / `8d838a1` |
