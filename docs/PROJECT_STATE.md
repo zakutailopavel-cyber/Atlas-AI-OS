@@ -48,7 +48,7 @@
 | 01 — AI-модели и Character Brain | Профили, внешность, seed, эталонное лицо, память | Подготовлен контракт Character Brain v1: обязательные поля, immutable facts, versioned memory, visual identity, voice и минимальные payload | Реализовать server-side legacy adapter без изменения данных |
 | 02 — Сцены и референсы | Modal, IP-Adapter/InstantID, сцены, улучшение, кэш | Подготовлен reference-first контракт: versioned источники, metadata, лицензии, change regions, подбор, дедупликация и QA лица/сцены | Согласовать целевую схему и реализовать ingest + cache preflight без GPU |
 | 03 — Контент-фабрика | Публикации, тексты, изображения, материалы, календарь | Подготовлен контракт Content Pipeline v1: единый lifecycle, ручной approval, межобластные payload и idempotency генерации/публикации | Согласовать статусы и реализовать server-side revisions + approval gate без изменения UI |
-| 04 — Интерфейс Atlas | Дизайн, адаптивность, модальные окна, карточки | 04-B-1 в работе: механически добавлены стабильные React keys для всех 13 JSX-итераций в `src/app/dashboard.tsx`; DOM/CSS/API/runtime не менялись | Завершить lint baseline по hooks/purity/img/alt отдельными узкими задачами после review 04-B-1 |
+| 04 — Интерфейс Atlas | Дизайн, адаптивность, модальные окна, карточки | 04-B-1 в работе: механически добавлены стабильные React keys для всех 13 JSX-итераций в `src/app/dashboard.tsx`; DOM/CSS/API/runtime не менялись | Завершить review 04-B-1; hooks/purity/img/alt исправлять отдельными узкими задачами |
 | 05 — Backend и инфраструктура | Supabase, Storage, RLS, Vercel, Modal, auth, расходы | Issue #59 закрыт: production reconciliation остановлен, потому что Supabase Free Plan не предоставляет backups/PITR; production migration repair, `db push` и migration `0900` не выполнялись | Не выполнять production reconciliation без нового ручного gate и доступного backup/PITR; следующий технический этап передан области 04-B |
 
 ## Открытые PR и решения
@@ -96,7 +96,7 @@
 
 | Дата | Область | Состояние | Изменение | PR/коммит |
 | --- | --- | --- | --- | --- |
-| 2026-07-18 | 04 | В работе | 04-B-1: механически добавлены стабильные React keys для 13 JSX-итераций в `src/app/dashboard.tsx`; hooks, purity, img/alt, DOM/CSS/API/runtime, production, OpenAI и Modal не трогались | draft PR |
+| 2026-07-18 | 04 | В работе | 04-B-1: механически добавлены стабильные React keys для 13 JSX-итераций в `src/app/dashboard.tsx`; hooks, purity, img/alt, DOM/CSS/API/runtime, production, OpenAI и Modal не трогались | draft PR #62 |
 | 2026-07-18 | 00 | Завершено | PR #60 слит и Issue #59 закрыт: production reconciliation остановлен из-за отсутствия backups/PITR на Supabase Free Plan; production migration repair, `db push`, migration `0900`, production/Supabase Cloud, OpenAI и Modal не запускались; следующий безопасный этап — 04-B | PR #60 / `ebf2590` |
 | 2026-07-18 | 05 | Завершено | PR #57 слит: GitHub Actions rehearsal run `29614156122` подтвердил одинаковый schema hash до/после, history ровно `0600`, `0700`, `0800` и pending `0900`; production/Supabase Cloud не подключались | PR #57 / `8d838a1` |
 | 2026-07-17 | 00 | Завершено | PR #55 слит: подтверждённый `main` — `b4c665a`, активная защита `main` зафиксирована; следующий текущий review — draft PR #57 для Issue #56 | PR #55 / `b4c665a` |
