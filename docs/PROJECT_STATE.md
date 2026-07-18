@@ -8,7 +8,7 @@
 - Production: https://atlas.epkoolitus.ee
 - Основной стек: Next.js 16, React 19, TypeScript, Supabase, Vercel, Modal GPU, OpenAI API.
 - Основная ветка: `main`.
-- Подтверждённый снимок `main`: `e1feaec` от 2026-07-17 — PR #58 слит, общая память синхронизирована после PR #57; production и Supabase Cloud не подключались и не изменялись.
+- Подтверждённый снимок `main`: `ebf2590` от 2026-07-18 — PR #60 слит после закрытия Issue #59; production reconciliation остановлен, production и Supabase Cloud не подключались и не изменялись.
 - Production на момент проверки 2026-07-13 отвечает и перенаправляет неавторизованного пользователя на `/login`.
 
 ## Как пользоваться этим файлом
@@ -44,20 +44,20 @@
 
 | Область | Ответственность | Текущее состояние | Ближайший фокус |
 | --- | --- | --- | --- |
-| 00 — Координатор | Архитектура, приоритеты, roadmap, контроль PR | Общая память актуализирована по подтверждённому `main` `e1feaec`; Issue #59 в работе, открытых PR на read-only проверке не было | Уточнить dry-run manifest для production migration-history reconciliation без выполнения production-команд |
+| 00 — Координатор | Архитектура, приоритеты, roadmap, контроль PR | Общая память актуализирована по подтверждённому `main` `ebf2590`; PR #60 merged, Issue #59 закрыт; production reconciliation остановлен из-за отсутствия backups/PITR на Supabase Free Plan | Координировать следующий безопасный этап 04-B: baseline screenshots и механическое извлечение типов/UI primitives без изменения DOM, CSS, runtime и production |
 | 01 — AI-модели и Character Brain | Профили, внешность, seed, эталонное лицо, память | Подготовлен контракт Character Brain v1: обязательные поля, immutable facts, versioned memory, visual identity, voice и минимальные payload | Реализовать server-side legacy adapter без изменения данных |
 | 02 — Сцены и референсы | Modal, IP-Adapter/InstantID, сцены, улучшение, кэш | Подготовлен reference-first контракт: versioned источники, metadata, лицензии, change regions, подбор, дедупликация и QA лица/сцены | Согласовать целевую схему и реализовать ingest + cache preflight без GPU |
 | 03 — Контент-фабрика | Публикации, тексты, изображения, материалы, календарь | Подготовлен контракт Content Pipeline v1: единый lifecycle, ручной approval, межобластные payload и idempotency генерации/публикации | Согласовать статусы и реализовать server-side revisions + approval gate без изменения UI |
 | 04 — Интерфейс Atlas | Дизайн, адаптивность, модальные окна, карточки | Подготовлен контракт UI Modules v1: feature-границы, props, единые actions/modal, три status-слоя, approval gate и безопасная декомпозиция без редизайна | Начать с baseline screenshots и механического извлечения типов + UI primitives |
-| 05 — Backend и инфраструктура | Supabase, Storage, RLS, Vercel, Modal, auth, расходы | Issue #59 в работе: уточняется production command manifest; после repair `0600 → 0700 → 0800` dry-run обязан показывать ровно pending `0900`, production/Supabase Cloud не подключались | Подготовить отдельное ручное решение по production reconciliation; выполнение и применение/repair `0900` запрещены до отдельного gate |
+| 05 — Backend и инфраструктура | Supabase, Storage, RLS, Vercel, Modal, auth, расходы | Issue #59 закрыт: production reconciliation остановлен, потому что Supabase Free Plan не предоставляет backups/PITR; production migration repair, `db push` и migration `0900` не выполнялись | Не выполнять production reconciliation без нового ручного gate и доступного backup/PITR; следующий технический этап передан области 04-B |
 
 ## Открытые PR и решения
 
 - PR #53 слит в `main`: Project state workflow запускается на каждом PR.
 - PR #51 слит в `main`: добавлены Atlas issue/PR templates и workflow проверки PROJECT_STATE.md.
 - PR #50 закрыт без merge.
-- PR #44, #45, #46, #47, #49, #51, #53, #55, #57 и #58 слиты в `main`; актуальный подтверждённый `main` — `e1feaec`.
-- Issue #56 выполнена и PR #57 слит; Issue #59 в работе: уточнение runbook/manifest без production-команд.
+- PR #44, #45, #46, #47, #49, #51, #53, #55, #57, #58 и #60 слиты в `main`; актуальный подтверждённый `main` — `ebf2590`.
+- Issue #56 выполнена и PR #57 слит; Issue #59 закрыт после PR #60: production reconciliation остановлен, потому что Supabase Free Plan не предоставляет backups/PITR.
 - Read-only проверка GitHub ruleset `Protect main` 2026-07-17 подтвердила `active` enforcement для default branch, обязательный PR, запрет branch deletion/non-fast-forward и required status checks `build` + `check-project-state`.
 - Каждый новый PR должен быть узким и относиться к одной области. Межобластные изменения сначала согласуются в области 00.
 
@@ -76,12 +76,12 @@
 
 ## Текущие приоритеты
 
-1. P0: завершить Issue #59 — уточнить production reconciliation manifest: после repair `0600 → 0700 → 0800` dry-run должен показывать ровно pending `0900`; production-команды пока запрещены.
-2. P0: подготовить безопасный план production migration-history reconciliation без исполнения clean-only baseline на существующей базе.
-3. P0: определить реалистичный lint baseline и добавить отдельную проверку без скрытия ошибок или отключения правил.
-4. P1: после reconciliation добавить nullable legacy bridge-поля `asset_url` и `review_comment` отдельной additive migration и исправить runtime error handling.
+1. P0: определить реалистичный lint baseline и добавить отдельную проверку без скрытия ошибок или отключения правил.
+2. P1: выполнить 04-B — baseline screenshots и механическое извлечение типов/UI primitives без изменения DOM, CSS, runtime и production.
+3. P1: после отдельного backup/PITR gate вернуться к решению по production migration-history reconciliation; production migration repair, `db push` и migration `0900` пока запрещены.
+4. P1: после безопасного reconciliation-решения добавить nullable legacy bridge-поля `asset_url` и `review_comment` отдельной additive migration и исправить runtime error handling.
 5. P1: согласовать последовательный owner/workspace и RLS cutover без потери текущих данных.
-6. P1: декомпозировать `dashboard.tsx` по модулям без визуального редизайна.
+6. P1: декомпозировать `dashboard.tsx` по модулям без визуального редизайна после 04-B.
 7. P1: реализовать бюджетные ограничения, защиту повторов и reference cache preflight без лишних GPU-запусков.
 
 ## Бюджетные ограничения
@@ -96,7 +96,7 @@
 
 | Дата | Область | Состояние | Изменение | PR/коммит |
 | --- | --- | --- | --- | --- |
-| 2026-07-17 | 00 | В работе | Issue #59: уточняется runbook production reconciliation — dry-run после `0600 → 0700 → 0800` должен показывать ровно pending `0900`; production/Supabase Cloud, repair, db push, OpenAI и Modal не запускались | draft PR |
+| 2026-07-18 | 00 | Завершено | PR #60 слит и Issue #59 закрыт: production reconciliation остановлен из-за отсутствия backups/PITR на Supabase Free Plan; production migration repair, `db push`, migration `0900`, production/Supabase Cloud, OpenAI и Modal не запускались; следующий безопасный этап — 04-B | PR #60 / `ebf2590` |
 | 2026-07-18 | 05 | Завершено | PR #57 слит: GitHub Actions rehearsal run `29614156122` подтвердил одинаковый schema hash до/после, history ровно `0600`, `0700`, `0800` и pending `0900`; production/Supabase Cloud не подключались | PR #57 / `8d838a1` |
 | 2026-07-17 | 00 | Завершено | PR #55 слит: подтверждённый `main` — `b4c665a`, активная защита `main` зафиксирована; следующий текущий review — draft PR #57 для Issue #56 | PR #55 / `b4c665a` |
 | 2026-07-17 | 00 | Завершено | PR #53 слит: Project state workflow запускается на каждом PR; GitHub ruleset `Protect main` настроен вручную без изменений из этого PR | PR #53 / `5a0988b` |
@@ -110,7 +110,6 @@
 | 2026-07-17 | 05 | В работе | Добавлена изолированная CI-проверка полного Supabase migration chain, Atlas schema/RLS/policies и отсутствия будущих полей без подключения к production | draft PR |
 | 2026-07-16 | 05 | В работе | Добавлен clean-only baseline core schema перед существующими migrations; production и migration history не изменялись | draft PR |
 | 2026-07-16 | 05 | В работе | Прослежен lifecycle `asset_url`/`review_comment` и зафиксирован безопасный порядок устранения runtime/schema drift без изменения production | draft PR |
-| 2026-07-16 | 05 | В работе | Зафиксирован обезличенный read-only inventory production Supabase и расхождения со схемой, migrations и data contract | draft PR |
 
 ## Шаблон передачи состояния после работы
 
