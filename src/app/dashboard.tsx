@@ -131,6 +131,7 @@ export default function Dashboard({ user }: { user: User }) {
         <nav>
           {menu.map((n, i) => (
             <button
+              key={n}
               className={page === n ? "active" : ""}
               onClick={() => setPage(n)}
             >
@@ -247,7 +248,7 @@ function Home({
           <button onClick={create}>✣ Создать контент</button>
         </div>
         <div className="hero-orbit" aria-hidden="true">
-          {models.slice(0, 3).map((m, i) => <div className={`orbit-avatar orbit-${i}`} style={m.visual_passport?.avatar ? {backgroundImage:`url(${m.visual_passport.avatar})`} : undefined}>{!m.visual_passport?.avatar && m.name.slice(0,1)}</div>)}
+          {models.slice(0, 3).map((m, i) => <div key={m.id} className={`orbit-avatar orbit-${i}`} style={m.visual_passport?.avatar ? {backgroundImage:`url(${m.visual_passport.avatar})`} : undefined}>{!m.visual_passport?.avatar && m.name.slice(0,1)}</div>)}
           <div className="orbit-core">✦</div>
         </div>
       </section>
@@ -258,7 +259,7 @@ function Home({
           ["ГОТОВО", ready],
           ["ЗАПЛАНИРОВАНО", items.filter((x) => x.publish_at).length],
         ].map((x) => (
-          <article>
+          <article key={x[0]}>
             <small>{x[0]}</small>
             <b>{x[1]}</b>
             <span>общая база</span>
@@ -314,7 +315,7 @@ function AvatarStudio({models,items,assets,close,savePortrait,saveAsset,attach}:
   </Modal>
 }
 function ModelCards({models,edit}:{models:Model[];edit?:(m:Model)=>void}) {
-  return <div className="models">{models.slice(0, edit ? undefined : 3).map((m,i)=><article onClick={()=>edit?.(m)}>
+  return <div className="models">{models.slice(0, edit ? undefined : 3).map((m,i)=><article key={m.id} onClick={()=>edit?.(m)}>
     <div className={`portrait p${i%3}`}>{m.visual_passport?.avatar&&<img src={m.visual_passport.avatar} alt={m.name}/>} 
       <small>{m.status === "active" ? "Активна" : "Черновик"}</small><button onClick={(e)=>e.stopPropagation()}>•••</button>
     </div>
@@ -380,7 +381,7 @@ function ContentList({
   return (
     <div className="list">
       {items.map((x) => (
-        <article onClick={() => open?.(x)}>
+        <article key={x.id} onClick={() => open?.(x)}>
           <i>{x.format?.includes("Reel") ? "▶" : "▧"}</i>
           <div>
             <b>{x.title}</b>
@@ -429,7 +430,7 @@ function Calendar({ items }: { items: Item[] }) {
               String(a.publish_at).localeCompare(String(b.publish_at)),
             )
             .map((x) => (
-              <article>
+              <article key={x.id}>
                 <time>
                   {new Date(x.publish_at!).toLocaleDateString("ru-RU", {
                     day: "2-digit",
@@ -461,7 +462,7 @@ function Team({ team }: { team: { email: string; role: string }[] }) {
   return (
     <div className="team">
       {team.map((x) => (
-        <article>
+        <article key={x.email}>
           <b>{x.email.slice(0, 2).toUpperCase()}</b>
           <div>
             <h3>{x.email}</h3>
@@ -540,6 +541,7 @@ function ModelDialog({
       <div className="brain-tabs">
         {["Личность", "Внешность", "Память и сюжет"].map((x) => (
           <button
+            key={x}
             className={tab === x ? "active" : ""}
             onClick={() => setTab(x)}
           >
@@ -550,7 +552,7 @@ function ModelDialog({
       {tab === "Личность" && (
         <div className="form">
           {(["name", "handle", "niche", "bio"] as const).map((k) => (
-            <label>
+            <label key={k}>
               {
                 (
                   {
@@ -892,7 +894,7 @@ function ContentDialog({
             onChange={(e) => setX({ ...x, model_id: e.target.value })}
           >
             {models.map((m) => (
-              <option value={m.id}>{m.name}</option>
+              <option key={m.id} value={m.id}>{m.name}</option>
             ))}
           </select>
         </label>
@@ -1091,7 +1093,7 @@ function WeekPlanner({
               onChange={(e) => setModelId(e.target.value)}
             >
               {models.map((m) => (
-                <option value={m.id}>{m.name}</option>
+                <option key={m.id} value={m.id}>{m.name}</option>
               ))}
             </select>
           </label>
@@ -1138,7 +1140,7 @@ function WeekPlanner({
           </div>
           <div className="week-posts">
             {plan.posts.map((p, i) => (
-              <article>
+              <article key={`${String(p.day_offset)}-${String(p.publish_time)}-${String(p.platform)}-${String(p.format)}-${String(p.title)}-${String(p.goal)}`}>
                 <span>{i + 1}</span>
                 <div>
                   <b>{String(p.title)}</b>
@@ -1198,6 +1200,7 @@ function PublicationDialog({
       <div className="publication-tabs">
         {["Предпросмотр", "Материалы", "Согласование"].map((x) => (
           <button
+            key={x}
             className={tab === x ? "active" : ""}
             onClick={() => setTab(x)}
           >
