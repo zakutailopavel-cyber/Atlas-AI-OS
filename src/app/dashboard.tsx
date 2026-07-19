@@ -233,9 +233,10 @@ function Home({
   items: Item[];
   create: () => void;
 }) {
+  const [renderedAt] = useState(() => Date.now());
   const ready = items.filter((x) => x.status === "ready" || x.status === "published").length;
   const scheduled = [...items]
-    .filter((x) => x.publish_at && new Date(x.publish_at).getTime() >= Date.now())
+    .filter((x) => x.publish_at && new Date(x.publish_at).getTime() >= renderedAt)
     .sort((a, b) => String(a.publish_at).localeCompare(String(b.publish_at)))[0];
   const scheduledModel = models.find((m) => m.id === scheduled?.model_id);
   return (
@@ -510,7 +511,7 @@ function ModelDialog({
   save: (m: Partial<Model>) => void;
 }) {
   const [tab, setTab] = useState("Личность"),
-    [m, setM] = useState<Partial<Model>>(
+    [m, setM] = useState<Partial<Model>>(() =>
       model || {
         name: "",
         handle: "",

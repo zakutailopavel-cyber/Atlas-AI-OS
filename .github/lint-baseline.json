@@ -1,8 +1,7 @@
 {
   "version": 1,
-  "description": "Known ESLint findings on main after PR #65. Counts are maximums, not suppressions.",
+  "description": "Known ESLint findings after removing the react-hooks/purity baseline. Counts are maximums, not suppressions.",
   "errors": {
-    "react-hooks/purity": 2,
     "react-hooks/set-state-in-effect": 2
   },
   "warnings": {
