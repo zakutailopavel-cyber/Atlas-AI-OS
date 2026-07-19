@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "description": "Known ESLint findings on main after PR #65. Counts are maximums, not suppressions.",
+  "errors": {
+    "react-hooks/purity": 2,
+    "react-hooks/set-state-in-effect": 2
+  },
+  "warnings": {
+    "@next/next/no-img-element": 4,
+    "@typescript-eslint/no-unused-vars": 2,
+    "react-hooks/exhaustive-deps": 2
+  }
+}
