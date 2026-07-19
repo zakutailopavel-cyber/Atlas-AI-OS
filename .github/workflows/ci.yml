@@ -25,5 +25,8 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Check lint non-regression baseline
+        run: npm run lint:baseline
+
       - name: Build application
         run: npm run build
