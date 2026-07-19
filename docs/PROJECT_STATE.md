@@ -8,7 +8,7 @@
 - Production: https://atlas.epkoolitus.ee
 - Основной стек: Next.js 16, React 19, TypeScript, Supabase, Vercel, Modal GPU, OpenAI API.
 - Основная ветка: `main`.
-- Подтверждённый снимок `main`: `c0c85da` от 2026-07-19 — PR #70 синхронизировал общую память после PR #69; production, Supabase Cloud, DOM/CSS/API/runtime, OpenAI и Modal не подключались и не изменялись.
+- Подтверждённый снимок `main`: `7c04054` от 2026-07-19 — PR #71 утвердил стратегию малого масштаба; production, Supabase Cloud, DOM/CSS/API/runtime, OpenAI и Modal не подключались и не изменялись.
 - Production на момент проверки 2026-07-13 отвечает и перенаправляет неавторизованного пользователя на `/login`.
 
 ## Как пользоваться этим файлом
@@ -46,7 +46,7 @@
 
 | Область | Ответственность | Текущее состояние | Ближайший фокус |
 | --- | --- | --- | --- |
-| 00 — Координатор | Архитектура, приоритеты, roadmap, контроль PR | 00-F: активная стратегия малого масштаба зафиксирована в `docs/PRODUCT_STRATEGY.md`; актуальный `main` — `c0c85da`, открытых PR на старте задачи нет | Сначала завершить tenant boundary и роли, затем Content Pipeline v1; Fan Interaction Assistant, Cost Governor и Funnel Analytics вводить только следующими узкими этапами |
+| 00 — Координатор | Архитектура, приоритеты, roadmap, контроль PR | 00-F завершена: PR #71 слит, стратегия малого масштаба активна; актуальный `main` — `7c04054`, открытых PR на момент синхронизации нет | Сначала завершить tenant/workspace boundary и роли помощников, затем Content Pipeline v1; Fan Interaction Assistant, Cost Governor и Funnel Analytics вводить только следующими узкими этапами |
 | 01 — AI-модели и Character Brain | Профили, внешность, seed, эталонное лицо, память | Подготовлен контракт Character Brain v1: обязательные поля, immutable facts, versioned memory, visual identity, voice и минимальные payload | Реализовать server-side legacy adapter без изменения данных |
 | 02 — Сцены и референсы | Modal, IP-Adapter/InstantID, сцены, улучшение, кэш | Подготовлен reference-first контракт: versioned источники, metadata, лицензии, change regions, подбор, дедупликация и QA лица/сцены | Согласовать целевую схему и реализовать ingest + cache preflight без GPU |
 | 03 — Контент-фабрика | Публикации, тексты, изображения, материалы, календарь | Подготовлен контракт Content Pipeline v1: единый lifecycle, ручной approval, межобластные payload и idempotency генерации/публикации | Согласовать статусы и реализовать server-side revisions + approval gate без изменения UI |
@@ -55,12 +55,13 @@
 
 ## Открытые PR и решения
 
+- PR #71 слит в `main`: `docs/PRODUCT_STRATEGY.md` стал активным roadmap — один персонаж до подтверждённой экономики, ручные compliance/approval gates и последовательное внедрение Assistant, Cost Governor и Funnel Analytics.
 - PR #53 слит в `main`: Project state workflow запускается на каждом PR.
 - PR #67 слит в `main`: lint non-regression baseline обязателен внутри required check `build`; новые findings сверх baseline блокируют merge.
 - PR #69 слит в `main`: `react-hooks/purity` = 0; lint baseline уменьшен до двух ошибок `react-hooks/set-state-in-effect` и восьми предупреждений.
 - PR #51 слит в `main`: добавлены Atlas issue/PR templates и workflow проверки PROJECT_STATE.md.
 - PR #50 закрыт без merge.
-- PR #44, #45, #46, #47, #49, #51, #53, #55, #57, #58, #60, #62, #64, #65, #66, #67 и #69 слиты в `main`; актуальный подтверждённый `main` — `4651d53`.
+- PR #44, #45, #46, #47, #49, #51, #53, #55, #57, #58, #60, #62, #64, #65, #66, #67, #69, #70 и #71 слиты в `main`; актуальный подтверждённый `main` — `7c04054`.
 - Issue #56 выполнена и PR #57 слит; Issue #59 закрыт после PR #60: production reconciliation остановлен, потому что Supabase Free Plan не предоставляет backups/PITR.
 - Read-only проверка GitHub ruleset `Protect main` 2026-07-17 подтвердила `active` enforcement для default branch, обязательный PR, запрет branch deletion/non-fast-forward и required status checks `build` + `check-project-state`.
 - Каждый новый PR должен быть узким и относиться к одной области. Межобластные изменения сначала согласуются в области 00.
@@ -101,7 +102,7 @@
 
 | Дата | Область | Состояние | Изменение | PR/коммит |
 | --- | --- | --- | --- | --- |
-| 2026-07-19 | 00 | В работе | 00-F: добавлена активная стратегия малого масштаба — один персонаж до подтверждённой экономики, Fanvue как проверяемый кандидат, ручной approval, затем Fan Interaction Assistant, Cost Governor и Funnel Analytics; production и платные API не запускались | draft PR |
+| 2026-07-19 | 00 | Завершено | PR #71 слит в `main` `7c04054`: активирована стратегия малого масштаба — один персонаж до подтверждённой экономики, Fanvue как проверяемый кандидат, ручной approval, затем Fan Interaction Assistant, Cost Governor и Funnel Analytics; production и платные API не запускались | PR #71 / `7c04054` |
 | 2026-07-19 | 04 | Завершено | PR #69 слит в `main` `4651d53`: 04-B-3 устранила 2 ошибки `react-hooks/purity`, baseline purity удалён; `set-state-in-effect`, DOM/CSS/API/runtime, production, Supabase Cloud, OpenAI и Modal не менялись | PR #69 / `4651d53` |
 | 2026-07-19 | 00 | Завершено | PR #67 слит в `main` `6f9e39d`: required CI `build` теперь блокирует новые lint findings сверх baseline; ESLint-правила, UI/runtime, production, Supabase Cloud, OpenAI и Modal не менялись | PR #67 / `6f9e39d` |
 | 2026-07-18 | 04 | Завершено | PR #65 слит: 04-B-2 добавила только осмысленные `alt` четырём существующим `<img>`; `jsx-a11y/alt-text` = 0, React keys, DOM/CSS/API/runtime, production, Supabase Cloud, OpenAI и Modal не менялись | PR #65 / `a23d425` |
