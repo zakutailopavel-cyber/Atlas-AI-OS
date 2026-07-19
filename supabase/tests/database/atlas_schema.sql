@@ -2,7 +2,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 
-select plan(27);
+select plan(33);
 
 select has_table('public', 'profiles', 'profiles exists');
 select has_table('public', 'ai_models', 'ai_models exists');
@@ -10,20 +10,19 @@ select has_table('public', 'content_items', 'content_items exists');
 select has_table('public', 'generation_jobs', 'generation_jobs exists');
 select has_table('public', 'model_references', 'model_references exists');
 
-select results_eq(
-  $$
-    select version::text
+select is(
+  (
+    select array_agg(version::text order by version)
     from supabase_migrations.schema_migrations
-    order by version
-  $$,
-  $$
-    values
-      ('202607120600'::text),
-      ('202607120700'::text),
-      ('202607120800'::text),
-      ('202607170900'::text)
-  $$,
-  'the complete 0600 -> 0700 -> 0800 -> 0900 chain is recorded'
+  ),
+  array[
+    '202607120600',
+    '202607120700',
+    '202607120800',
+    '202607170900',
+    '202607191000'
+  ]::text[],
+  'the complete 0600 -> 0700 -> 0800 -> 0900 -> 1000 chain is recorded'
 );
 
 select set_eq(
@@ -38,15 +37,18 @@ select set_eq(
         ('ai_models', 'id'),
         ('ai_models', 'name'),
         ('ai_models', 'visual_passport'),
+        ('ai_models', 'owner_id'),
         ('content_items', 'id'),
         ('content_items', 'model_id'),
         ('content_items', 'shot_list'),
         ('generation_jobs', 'id'),
         ('generation_jobs', 'model_id'),
         ('generation_jobs', 'kind'),
+        ('generation_jobs', 'owner_id'),
         ('model_references', 'id'),
         ('model_references', 'model_id'),
         ('model_references', 'storage_path'),
+        ('model_references', 'owner_id'),
         ('workspaces', 'id'),
         ('workspaces', 'name'),
         ('workspace_members', 'owner_id'),
@@ -62,15 +64,18 @@ select set_eq(
       ('ai_models:id'),
       ('ai_models:name'),
       ('ai_models:visual_passport'),
+      ('ai_models:owner_id'),
       ('content_items:id'),
       ('content_items:model_id'),
       ('content_items:shot_list'),
       ('generation_jobs:id'),
       ('generation_jobs:model_id'),
       ('generation_jobs:kind'),
+      ('generation_jobs:owner_id'),
       ('model_references:id'),
       ('model_references:model_id'),
       ('model_references:storage_path'),
+      ('model_references:owner_id'),
       ('workspaces:id'),
       ('workspaces:name'),
       ('workspace_members:owner_id'),
@@ -105,6 +110,7 @@ select set_eq(
       ('profiles_role_check'),
       ('ai_models_pkey'),
       ('ai_models_created_by_fkey'),
+      ('ai_models_owner_id_fkey'),
       ('content_items_pkey'),
       ('content_items_model_id_fkey'),
       ('content_items_created_by_fkey'),
@@ -114,11 +120,13 @@ select set_eq(
       ('generation_jobs_status_check'),
       ('generation_jobs_created_by_fkey'),
       ('generation_jobs_kind_check'),
+      ('generation_jobs_owner_id_fkey'),
       ('model_references_pkey'),
       ('model_references_model_id_fkey'),
       ('model_references_kind_check'),
       ('model_references_generation_job_id_fkey'),
       ('model_references_created_by_fkey'),
+      ('model_references_owner_id_fkey'),
       ('workspaces_pkey'),
       ('workspaces_created_by_fkey'),
       ('workspaces_status_check'),
@@ -267,6 +275,9 @@ select is(
 select has_table('public', 'workspaces', 'workspaces exists');
 select has_table('public', 'workspace_members', 'workspace_members exists');
 select has_column('public', 'content_items', 'owner_id', 'content_items nullable owner_id bridge exists');
+select has_column('public', 'ai_models', 'owner_id', 'ai_models nullable owner_id bridge exists');
+select has_column('public', 'generation_jobs', 'owner_id', 'generation_jobs nullable owner_id bridge exists');
+select has_column('public', 'model_references', 'owner_id', 'model_references nullable owner_id bridge exists');
 
 select is(
   (
@@ -278,6 +289,42 @@ select is(
   ),
   'YES',
   'content_items.owner_id remains nullable before backfill and cutover'
+);
+
+select is(
+  (
+    select is_nullable
+    from information_schema.columns
+    where table_schema = 'public'
+      and table_name = 'ai_models'
+      and column_name = 'owner_id'
+  ),
+  'YES',
+  'ai_models.owner_id remains nullable before backfill and cutover'
+);
+
+select is(
+  (
+    select is_nullable
+    from information_schema.columns
+    where table_schema = 'public'
+      and table_name = 'generation_jobs'
+      and column_name = 'owner_id'
+  ),
+  'YES',
+  'generation_jobs.owner_id remains nullable before backfill and cutover'
+);
+
+select is(
+  (
+    select is_nullable
+    from information_schema.columns
+    where table_schema = 'public'
+      and table_name = 'model_references'
+      and column_name = 'owner_id'
+  ),
+  'YES',
+  'model_references.owner_id remains nullable before backfill and cutover'
 );
 
 select has_function('public', 'is_workspace_member', array['uuid'], 'membership helper exists');
@@ -359,11 +406,14 @@ select is(
         'workspaces_created_by_idx',
         'workspace_members_user_id_idx',
         'workspace_members_active_owner_role_idx',
-        'content_items_owner_id_idx'
+        'content_items_owner_id_idx',
+        'ai_models_owner_id_idx',
+        'generation_jobs_owner_id_idx',
+        'model_references_owner_id_idx'
       )
   ),
-  5,
-  'tenant foundation indexes exist'
+  8,
+  'tenant foundation and nullable owner bridge indexes exist'
 );
 
 select * from finish();
