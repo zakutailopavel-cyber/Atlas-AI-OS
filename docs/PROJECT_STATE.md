@@ -8,7 +8,7 @@
 - Production: https://atlas.epkoolitus.ee
 - Основной стек: Next.js 16, React 19, TypeScript, Supabase, Vercel, Modal GPU, OpenAI API.
 - Основная ветка: `main`.
-- Подтверждённый снимок `main`: `6f9e39d` от 2026-07-19 — PR #67 добавил lint non-regression baseline в обязательный CI `build`; production, Supabase Cloud, UI/runtime, OpenAI и Modal не подключались и не изменялись.
+- Подтверждённый снимок `main`: `4651d53` от 2026-07-19 — PR #69 устранил 2 ошибки `react-hooks/purity` и удалил их из lint baseline; production, Supabase Cloud, DOM/CSS/API/runtime, OpenAI и Modal не подключались и не изменялись.
 - Production на момент проверки 2026-07-13 отвечает и перенаправляет неавторизованного пользователя на `/login`.
 
 ## Как пользоваться этим файлом
@@ -44,20 +44,21 @@
 
 | Область | Ответственность | Текущее состояние | Ближайший фокус |
 | --- | --- | --- | --- |
-| 00 — Координатор | Архитектура, приоритеты, roadmap, контроль PR | PR #67 слит в `main` `6f9e39d`: обязательный CI `build` отклоняет новые lint findings сверх зафиксированного baseline; suppressions и ESLint-правила не добавлялись; открытых PR на момент проверки нет | Отдельной задачей области 04 устранить 2 ошибки `react-hooks/purity` без смешивания с другими lint-категориями |
+| 00 — Координатор | Архитектура, приоритеты, roadmap, контроль PR | PR #69 слит в `main` `4651d53`: `react-hooks/purity` = 0, обязательный CI продолжает защищать lint baseline; открытых PR на момент проверки нет | Отдельной задачей области 04 разобрать 2 ошибки `react-hooks/set-state-in-effect` без смешивания с DOM/CSS/API/runtime |
 | 01 — AI-модели и Character Brain | Профили, внешность, seed, эталонное лицо, память | Подготовлен контракт Character Brain v1: обязательные поля, immutable facts, versioned memory, visual identity, voice и минимальные payload | Реализовать server-side legacy adapter без изменения данных |
 | 02 — Сцены и референсы | Modal, IP-Adapter/InstantID, сцены, улучшение, кэш | Подготовлен reference-first контракт: versioned источники, metadata, лицензии, change regions, подбор, дедупликация и QA лица/сцены | Согласовать целевую схему и реализовать ingest + cache preflight без GPU |
 | 03 — Контент-фабрика | Публикации, тексты, изображения, материалы, календарь | Подготовлен контракт Content Pipeline v1: единый lifecycle, ручной approval, межобластные payload и idempotency генерации/публикации | Согласовать статусы и реализовать server-side revisions + approval gate без изменения UI |
-| 04 — Интерфейс Atlas | Дизайн, адаптивность, модальные окна, карточки | 04-B-1 и 04-B-2 завершены; в 04-B-3 точечно устранены 2 ошибки `react-hooks/purity`, соответствующий baseline удалён; остальные lint-категории, DOM/CSS/API/runtime не менялись | Проверить draft PR 04-B-3 и обязательные CI; merge выполняет только владелец |
+| 04 — Интерфейс Atlas | Дизайн, адаптивность, модальные окна, карточки | 04-B-1, 04-B-2 и 04-B-3 завершены; PR #69 устранил 2 ошибки `react-hooks/purity`, соответствующий baseline удалён; осталось 2 ошибки `react-hooks/set-state-in-effect` | Отдельно устранить только `set-state-in-effect`, сохранив текущее поведение и не меняя DOM/CSS/API/runtime |
 | 05 — Backend и инфраструктура | Supabase, Storage, RLS, Vercel, Modal, auth, расходы | Issue #59 закрыт: production reconciliation остановлен, потому что Supabase Free Plan не предоставляет backups/PITR; production migration repair, `db push` и migration `0900` не выполнялись | Не выполнять production reconciliation без нового ручного gate и доступного backup/PITR; следующий технический этап передан области 04-B |
 
 ## Открытые PR и решения
 
 - PR #53 слит в `main`: Project state workflow запускается на каждом PR.
 - PR #67 слит в `main`: lint non-regression baseline обязателен внутри required check `build`; новые findings сверх baseline блокируют merge.
+- PR #69 слит в `main`: `react-hooks/purity` = 0; lint baseline уменьшен до двух ошибок `react-hooks/set-state-in-effect` и восьми предупреждений.
 - PR #51 слит в `main`: добавлены Atlas issue/PR templates и workflow проверки PROJECT_STATE.md.
 - PR #50 закрыт без merge.
-- PR #44, #45, #46, #47, #49, #51, #53, #55, #57, #58, #60, #62, #64, #65, #66 и #67 слиты в `main`; актуальный подтверждённый `main` — `6f9e39d`.
+- PR #44, #45, #46, #47, #49, #51, #53, #55, #57, #58, #60, #62, #64, #65, #66, #67 и #69 слиты в `main`; актуальный подтверждённый `main` — `4651d53`.
 - Issue #56 выполнена и PR #57 слит; Issue #59 закрыт после PR #60: production reconciliation остановлен, потому что Supabase Free Plan не предоставляет backups/PITR.
 - Read-only проверка GitHub ruleset `Protect main` 2026-07-17 подтвердила `active` enforcement для default branch, обязательный PR, запрет branch deletion/non-fast-forward и required status checks `build` + `check-project-state`.
 - Каждый новый PR должен быть узким и относиться к одной области. Межобластные изменения сначала согласуются в области 00.
@@ -77,7 +78,7 @@
 
 ## Текущие приоритеты
 
-1. P1: отдельной задачей области 04 устранить 2 ошибки `react-hooks/purity`, затем уменьшить соответствующий baseline; не смешивать с `set-state-in-effect`, DOM/CSS/API/runtime или редизайном.
+1. P1: отдельной задачей области 04 устранить 2 ошибки `react-hooks/set-state-in-effect`, затем уменьшить соответствующий baseline; не смешивать с DOM/CSS/API/runtime или редизайном.
 2. P1: продолжить 04-B — baseline screenshots и механическое извлечение типов/UI primitives без изменения DOM, CSS, runtime и production.
 3. P1: после отдельного backup/PITR gate вернуться к решению по production migration-history reconciliation; production migration repair, `db push` и migration `0900` пока запрещены.
 4. P1: после безопасного reconciliation-решения добавить nullable legacy bridge-поля `asset_url` и `review_comment` отдельной additive migration и исправить runtime error handling.
@@ -97,7 +98,7 @@
 
 | Дата | Область | Состояние | Изменение | PR/коммит |
 | --- | --- | --- | --- | --- |
-| 2026-07-19 | 04 | В работе | 04-B-3 точечно устраняет 2 ошибки `react-hooks/purity`: время планирования фиксируется lazy state initializer, seed новой модели создаётся только lazy initializer; baseline purity удалён, `set-state-in-effect`, DOM/CSS/API/runtime, production, Supabase Cloud, OpenAI и Modal не менялись | draft PR |
+| 2026-07-19 | 04 | Завершено | PR #69 слит в `main` `4651d53`: 04-B-3 устранила 2 ошибки `react-hooks/purity`, baseline purity удалён; `set-state-in-effect`, DOM/CSS/API/runtime, production, Supabase Cloud, OpenAI и Modal не менялись | PR #69 / `4651d53` |
 | 2026-07-19 | 00 | Завершено | PR #67 слит в `main` `6f9e39d`: required CI `build` теперь блокирует новые lint findings сверх baseline; ESLint-правила, UI/runtime, production, Supabase Cloud, OpenAI и Modal не менялись | PR #67 / `6f9e39d` |
 | 2026-07-18 | 04 | Завершено | PR #65 слит: 04-B-2 добавила только осмысленные `alt` четырём существующим `<img>`; `jsx-a11y/alt-text` = 0, React keys, DOM/CSS/API/runtime, production, Supabase Cloud, OpenAI и Modal не менялись | PR #65 / `a23d425` |
 | 2026-07-18 | 04 | Завершено | PR #62 слит: 04-B-1 механически добавила стабильные React keys для 13 JSX-итераций в `src/app/dashboard.tsx`; `react/jsx-key` = 0, DOM/CSS/API/runtime, production, OpenAI и Modal не менялись | PR #62 / `104bc59` |
