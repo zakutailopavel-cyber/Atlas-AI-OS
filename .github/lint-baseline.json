@@ -6,8 +6,8 @@
     "react-hooks/set-state-in-effect": 2
   },
   "warnings": {
-    "@next/next/no-img-element": 4,
-    "@typescript-eslint/no-unused-vars": 2,
-    "react-hooks/exhaustive-deps": 2
+    "@next/next/no-img-element": 6,
+    "@typescript-eslint/no-unused-vars": 1,
+    "react-hooks/exhaustive-deps": 1
   }
 }
