@@ -10,20 +10,18 @@ select has_table('public', 'content_items', 'content_items exists');
 select has_table('public', 'generation_jobs', 'generation_jobs exists');
 select has_table('public', 'model_references', 'model_references exists');
 
-select results_eq(
-  $$
-    select version::text
+select is(
+  (
+    select array_agg(version::text order by version)
     from supabase_migrations.schema_migrations
-    order by version
-  $$,
-  $$
-    values
-      ('202607120600'::text),
-      ('202607120700'::text),
-      ('202607120800'::text),
-      ('202607170900'::text),
-      ('202607191000'::text)
-  $,
+  ),
+  array[
+    '202607120600',
+    '202607120700',
+    '202607120800',
+    '202607170900',
+    '202607191000'
+  ]::text[],
   'the complete 0600 -> 0700 -> 0800 -> 0900 -> 1000 chain is recorded'
 );
 
