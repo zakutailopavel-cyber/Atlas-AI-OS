@@ -7,6 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "lint:baseline": "node scripts/check-lint-baseline.mjs",
     "check:project-state": "node scripts/check-project-state.mjs"
   },
   "dependencies": {
