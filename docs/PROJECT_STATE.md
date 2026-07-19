@@ -51,7 +51,7 @@
 | 02 — Сцены и референсы | Modal, IP-Adapter/InstantID, сцены, улучшение, кэш | Подготовлен reference-first контракт: versioned источники, metadata, лицензии, change regions, подбор, дедупликация и QA лица/сцены | Согласовать целевую схему и реализовать ingest + cache preflight без GPU |
 | 03 — Контент-фабрика | Публикации, тексты, изображения, материалы, календарь | Подготовлен контракт Content Pipeline v1: единый lifecycle, ручной approval, межобластные payload и idempotency генерации/публикации | Согласовать статусы и реализовать server-side revisions + approval gate без изменения UI |
 | 04 — Интерфейс Atlas | Дизайн, адаптивность, модальные окна, карточки | 04-B-1, 04-B-2 и 04-B-3 завершены; PR #69 устранил 2 ошибки `react-hooks/purity`, соответствующий baseline удалён; осталось 2 ошибки `react-hooks/set-state-in-effect` | Отдельно устранить только `set-state-in-effect`, сохранив текущее поведение и не меняя DOM/CSS/API/runtime |
-| 05 — Backend и инфраструктура | Supabase, Storage, RLS, Vercel, Modal, auth, расходы | Issue #59 закрыт: production reconciliation остановлен, потому что Supabase Free Plan не предоставляет backups/PITR; production migration repair, `db push` и migration `0900` не выполнялись | Не выполнять production reconciliation без нового ручного gate и доступного backup/PITR; следующий технический этап передан области 04-B |
+| 05 — Backend и инфраструктура | Supabase, Storage, RLS, Vercel, Modal, auth, расходы | 05-J: подготовлен additive nullable tenant bridge для `ai_models`, `generation_jobs` и `model_references`; без backfill, RLS cutover и production-доступа | Проверить неоднозначные ownership-связи и подготовить отдельный, вручную gated backfill-план; `created_by` не использовать как `owner_id` |
 
 ## Открытые PR и решения
 
@@ -116,7 +116,7 @@
 | 2026-07-17 | 00 | Завершено | Добавлена корневая инструкция для агентов: обязательный контекст, границы областей, проверки, draft PR и ручные production/GPU/merge gates | PR #46 / `7f107b5` |
 | 2026-07-17 | 05 | Завершено | Зафиксировано evidence schema equivalence: PR #43 закрыт без merge, diagnostic run `29589401343` успешен, clean chain и production/local hashes совпали; следующий gate — rehearsal bootstrap history без production | PR #45 / `833c461` |
 | 2026-07-17 | 00 | Завершено | Geist Sans и Geist Mono переведены с build-time Google Fonts на локальный пакет того же шрифта для воспроизводимой сборки Codex Cloud | PR #44 |
-| 2026-07-17 | 05 | В работе | Подготовлен gated runbook reconciliation migration history с read-only preflight, staging, backup, rollback и ручными разрешениями без изменения production | draft PR |
+| 2026-07-19 | 05 | В работе | 05-J добавляет nullable `owner_id` bridge для моделей, generation jobs и references с FK/индексами; без backfill, изменения legacy RLS, production/Supabase Cloud, OpenAI и Modal | draft PR |
 
 ## Шаблон передачи состояния после работы
 
