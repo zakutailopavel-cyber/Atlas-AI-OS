@@ -51,7 +51,7 @@
 | 02 — Сцены и референсы | Modal, IP-Adapter/InstantID, сцены, улучшение, кэш | Подготовлен reference-first контракт: versioned источники, metadata, лицензии, change regions, подбор, дедупликация и QA лица/сцены | Согласовать целевую схему и реализовать ingest + cache preflight без GPU |
 | 03 — Контент-фабрика | Публикации, тексты, изображения, материалы, календарь | Подготовлен контракт Content Pipeline v1: единый lifecycle, ручной approval, межобластные payload и idempotency генерации/публикации | Согласовать статусы и реализовать server-side revisions + approval gate без изменения UI |
 | 04 — Интерфейс Atlas | Дизайн, адаптивность, модальные окна, карточки | 04-B-1, 04-B-2 и 04-B-3 завершены; PR #69 устранил 2 ошибки `react-hooks/purity`, соответствующий baseline удалён; осталось 2 ошибки `react-hooks/set-state-in-effect` | Отдельно устранить только `set-state-in-effect`, сохранив текущее поведение и не меняя DOM/CSS/API/runtime |
-| 05 — Backend и инфраструктура | Supabase, Storage, RLS, Vercel, Modal, auth, расходы | 05-J завершена: PR #73 слит; nullable `owner_id` bridge добавлен в `ai_models`, `generation_jobs` и `model_references` без backfill, RLS cutover и production-доступа | Только read-only классификация неоднозначных ownership-связей и подготовка вручную gated backfill-плана; автоматически использовать `created_by` как `owner_id` запрещено |
+| 05 — Backend и инфраструктура | Supabase, Storage, RLS, Vercel, Modal, auth, расходы | 05-K: подготовлен documentation-only ownership backfill plan с ручным назначением workspace каждой модели, parent-only наследованием и quarantine; execution не разрешён | Подготовить отдельную counts-only read-only preflight specification и rehearsal без production; `created_by` никогда автоматически не использовать как `owner_id` |
 
 ## Открытые PR и решения
 
@@ -103,6 +103,7 @@
 
 | Дата | Область | Состояние | Изменение | PR/коммит |
 | --- | --- | --- | --- | --- |
+| 2026-07-19 | 05 | В работе | 05-K зафиксировала безопасный ownership backfill plan: ручной model-to-workspace manifest, наследование content/jobs/references только через parent model, quarantine, counts/invariants/rollback и ручные gates; без SQL, production/Supabase Cloud, RLS cutover, OpenAI и Modal | draft PR |
 | 2026-07-19 | 05 | Завершено | PR #73 слит: 05-J добавила nullable `owner_id` bridge в `ai_models`, `generation_jobs` и `model_references` без backfill, RLS cutover и production-доступа; следующий этап — только read-only ownership-классификация и вручную gated backfill-план без автоматического `created_by` → `owner_id` | PR #73 / `3bc3b2b` |
 | 2026-07-19 | 00 | Завершено | PR #71 слит в `main` `7c04054`: активирована стратегия малого масштаба — один персонаж до подтверждённой экономики, Fanvue как проверяемый кандидат, ручной approval, затем Fan Interaction Assistant, Cost Governor и Funnel Analytics; production и платные API не запускались | PR #71 / `7c04054` |
 | 2026-07-19 | 04 | Завершено | PR #69 слит в `main` `4651d53`: 04-B-3 устранила 2 ошибки `react-hooks/purity`, baseline purity удалён; `set-state-in-effect`, DOM/CSS/API/runtime, production, Supabase Cloud, OpenAI и Modal не менялись | PR #69 / `4651d53` |
@@ -117,7 +118,6 @@
 | 2026-07-17 | 00 | Завершено | Подтверждён `main` `0022900`: PR #47 слит после PR #44–#46; открыт draft PR #49, его изменения не считаются состоянием `main` | PR #47 / `0022900` |
 | 2026-07-17 | 00 | Завершено | Добавлена корневая инструкция для агентов: обязательный контекст, границы областей, проверки, draft PR и ручные production/GPU/merge gates | PR #46 / `7f107b5` |
 | 2026-07-17 | 05 | Завершено | Зафиксировано evidence schema equivalence: PR #43 закрыт без merge, diagnostic run `29589401343` успешен, clean chain и production/local hashes совпали; следующий gate — rehearsal bootstrap history без production | PR #45 / `833c461` |
-| 2026-07-17 | 00 | Завершено | Geist Sans и Geist Mono переведены с build-time Google Fonts на локальный пакет того же шрифта для воспроизводимой сборки Codex Cloud | PR #44 |
 
 ## Шаблон передачи состояния после работы
 
