@@ -8,7 +8,7 @@
 - Production: https://atlas.epkoolitus.ee
 - Основной стек: Next.js 16, React 19, TypeScript, Supabase, Vercel, Modal GPU, OpenAI API.
 - Основная ветка: `main`.
-- Подтверждённый снимок `main`: `37724f1` от 2026-07-19 — PR #66 синхронизировал состояние после PR #65; production, Supabase Cloud, OpenAI и Modal не подключались и не изменялись.
+- Подтверждённый снимок `main`: `6f9e39d` от 2026-07-19 — PR #67 добавил lint non-regression baseline в обязательный CI `build`; production, Supabase Cloud, UI/runtime, OpenAI и Modal не подключались и не изменялись.
 - Production на момент проверки 2026-07-13 отвечает и перенаправляет неавторизованного пользователя на `/login`.
 
 ## Как пользоваться этим файлом
@@ -44,7 +44,7 @@
 
 | Область | Ответственность | Текущее состояние | Ближайший фокус |
 | --- | --- | --- | --- |
-| 00 — Координатор | Архитектура, приоритеты, roadmap, контроль PR | От актуального `main` `37724f1` подготовлена lint non-regression проверка: текущие findings зафиксированы как максимумы по rule/severity без suppressions; открытых PR до задачи не было | Проверить draft PR и после ручного merge считать новые lint findings блокирующими CI |
+| 00 — Координатор | Архитектура, приоритеты, roadmap, контроль PR | PR #67 слит в `main` `6f9e39d`: обязательный CI `build` отклоняет новые lint findings сверх зафиксированного baseline; suppressions и ESLint-правила не добавлялись; открытых PR на момент проверки нет | Отдельной задачей области 04 устранить 2 ошибки `react-hooks/purity` без смешивания с другими lint-категориями |
 | 01 — AI-модели и Character Brain | Профили, внешность, seed, эталонное лицо, память | Подготовлен контракт Character Brain v1: обязательные поля, immutable facts, versioned memory, visual identity, voice и минимальные payload | Реализовать server-side legacy adapter без изменения данных |
 | 02 — Сцены и референсы | Modal, IP-Adapter/InstantID, сцены, улучшение, кэш | Подготовлен reference-first контракт: versioned источники, metadata, лицензии, change regions, подбор, дедупликация и QA лица/сцены | Согласовать целевую схему и реализовать ingest + cache preflight без GPU |
 | 03 — Контент-фабрика | Публикации, тексты, изображения, материалы, календарь | Подготовлен контракт Content Pipeline v1: единый lifecycle, ручной approval, межобластные payload и idempotency генерации/публикации | Согласовать статусы и реализовать server-side revisions + approval gate без изменения UI |
@@ -54,9 +54,10 @@
 ## Открытые PR и решения
 
 - PR #53 слит в `main`: Project state workflow запускается на каждом PR.
+- PR #67 слит в `main`: lint non-regression baseline обязателен внутри required check `build`; новые findings сверх baseline блокируют merge.
 - PR #51 слит в `main`: добавлены Atlas issue/PR templates и workflow проверки PROJECT_STATE.md.
 - PR #50 закрыт без merge.
-- PR #44, #45, #46, #47, #49, #51, #53, #55, #57, #58, #60, #62, #64, #65 и #66 слиты в `main`; актуальный подтверждённый `main` — `37724f1`.
+- PR #44, #45, #46, #47, #49, #51, #53, #55, #57, #58, #60, #62, #64, #65, #66 и #67 слиты в `main`; актуальный подтверждённый `main` — `6f9e39d`.
 - Issue #56 выполнена и PR #57 слит; Issue #59 закрыт после PR #60: production reconciliation остановлен, потому что Supabase Free Plan не предоставляет backups/PITR.
 - Read-only проверка GitHub ruleset `Protect main` 2026-07-17 подтвердила `active` enforcement для default branch, обязательный PR, запрет branch deletion/non-fast-forward и required status checks `build` + `check-project-state`.
 - Каждый новый PR должен быть узким и относиться к одной области. Межобластные изменения сначала согласуются в области 00.
@@ -65,7 +66,7 @@
 
 ### P0 — блокирует надёжную параллельную разработку
 
-- Lint non-regression baseline подготовлен в текущем draft PR: существующие findings не скрываются, а CI отклоняет только превышение максимумов по rule/severity; риск закрывается после успешных checks и ручного merge.
+- Открытых P0-блокеров координации и воспроизводимой сборки на текущем `main` не зафиксировано. Lint non-regression baseline действует в required CI; существующий долг уменьшается отдельными узкими задачами.
 
 ### P1 — высокий риск конфликтов и расходов
 
@@ -76,8 +77,8 @@
 
 ## Текущие приоритеты
 
-1. P0: проверить и вручную слить lint non-regression baseline; после merge последовательно уменьшать baseline отдельными узкими задачами.
-2. P1: выполнить 04-B — baseline screenshots и механическое извлечение типов/UI primitives без изменения DOM, CSS, runtime и production.
+1. P1: отдельной задачей области 04 устранить 2 ошибки `react-hooks/purity`, затем уменьшить соответствующий baseline; не смешивать с `set-state-in-effect`, DOM/CSS/API/runtime или редизайном.
+2. P1: продолжить 04-B — baseline screenshots и механическое извлечение типов/UI primitives без изменения DOM, CSS, runtime и production.
 3. P1: после отдельного backup/PITR gate вернуться к решению по production migration-history reconciliation; production migration repair, `db push` и migration `0900` пока запрещены.
 4. P1: после безопасного reconciliation-решения добавить nullable legacy bridge-поля `asset_url` и `review_comment` отдельной additive migration и исправить runtime error handling.
 5. P1: согласовать последовательный owner/workspace и RLS cutover без потери текущих данных.
@@ -96,7 +97,7 @@
 
 | Дата | Область | Состояние | Изменение | PR/коммит |
 | --- | --- | --- | --- | --- |
-| 2026-07-19 | 00 | В работе | Добавлен lint non-regression baseline по rule/severity и CI-шаг `npm run lint:baseline`; ESLint-правила, UI/runtime, production, Supabase Cloud, OpenAI и Modal не менялись | draft PR |
+| 2026-07-19 | 00 | Завершено | PR #67 слит в `main` `6f9e39d`: required CI `build` теперь блокирует новые lint findings сверх baseline; ESLint-правила, UI/runtime, production, Supabase Cloud, OpenAI и Modal не менялись | PR #67 / `6f9e39d` |
 | 2026-07-18 | 04 | Завершено | PR #65 слит: 04-B-2 добавила только осмысленные `alt` четырём существующим `<img>`; `jsx-a11y/alt-text` = 0, React keys, DOM/CSS/API/runtime, production, Supabase Cloud, OpenAI и Modal не менялись | PR #65 / `a23d425` |
 | 2026-07-18 | 04 | Завершено | PR #62 слит: 04-B-1 механически добавила стабильные React keys для 13 JSX-итераций в `src/app/dashboard.tsx`; `react/jsx-key` = 0, DOM/CSS/API/runtime, production, OpenAI и Modal не менялись | PR #62 / `104bc59` |
 | 2026-07-18 | 00 | Завершено | PR #60 слит и Issue #59 закрыт: production reconciliation остановлен из-за отсутствия backups/PITR на Supabase Free Plan; production migration repair, `db push`, migration `0900`, production/Supabase Cloud, OpenAI и Modal не запускались; следующий безопасный этап — 04-B | PR #60 / `ebf2590` |
