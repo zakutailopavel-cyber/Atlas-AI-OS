@@ -48,7 +48,7 @@
 | 01 — AI-модели и Character Brain | Профили, внешность, seed, эталонное лицо, память | Подготовлен контракт Character Brain v1: обязательные поля, immutable facts, versioned memory, visual identity, voice и минимальные payload | Реализовать server-side legacy adapter без изменения данных |
 | 02 — Сцены и референсы | Modal, IP-Adapter/InstantID, сцены, улучшение, кэш | Подготовлен reference-first контракт: versioned источники, metadata, лицензии, change regions, подбор, дедупликация и QA лица/сцены | Согласовать целевую схему и реализовать ingest + cache preflight без GPU |
 | 03 — Контент-фабрика | Публикации, тексты, изображения, материалы, календарь | Подготовлен контракт Content Pipeline v1: единый lifecycle, ручной approval, межобластные payload и idempotency генерации/публикации | Согласовать статусы и реализовать server-side revisions + approval gate без изменения UI |
-| 04 — Интерфейс Atlas | Дизайн, адаптивность, модальные окна, карточки | 04-B-1 и 04-B-2 завершены; PR #65 добавил только осмысленные `alt` четырём существующим `<img>`, `jsx-a11y/alt-text` = 0; React keys, DOM/CSS/API/runtime не менялись | Выбрать следующую изолированную категорию lint отдельной задачей без редизайна |
+| 04 — Интерфейс Atlas | Дизайн, адаптивность, модальные окна, карточки | 04-B-1 и 04-B-2 завершены; в 04-B-3 точечно устранены 2 ошибки `react-hooks/purity`, соответствующий baseline удалён; остальные lint-категории, DOM/CSS/API/runtime не менялись | Проверить draft PR 04-B-3 и обязательные CI; merge выполняет только владелец |
 | 05 — Backend и инфраструктура | Supabase, Storage, RLS, Vercel, Modal, auth, расходы | Issue #59 закрыт: production reconciliation остановлен, потому что Supabase Free Plan не предоставляет backups/PITR; production migration repair, `db push` и migration `0900` не выполнялись | Не выполнять production reconciliation без нового ручного gate и доступного backup/PITR; следующий технический этап передан области 04-B |
 
 ## Открытые PR и решения
@@ -97,6 +97,7 @@
 
 | Дата | Область | Состояние | Изменение | PR/коммит |
 | --- | --- | --- | --- | --- |
+| 2026-07-19 | 04 | В работе | 04-B-3 точечно устраняет 2 ошибки `react-hooks/purity`: время планирования фиксируется lazy state initializer, seed новой модели создаётся только lazy initializer; baseline purity удалён, `set-state-in-effect`, DOM/CSS/API/runtime, production, Supabase Cloud, OpenAI и Modal не менялись | draft PR |
 | 2026-07-19 | 00 | Завершено | PR #67 слит в `main` `6f9e39d`: required CI `build` теперь блокирует новые lint findings сверх baseline; ESLint-правила, UI/runtime, production, Supabase Cloud, OpenAI и Modal не менялись | PR #67 / `6f9e39d` |
 | 2026-07-18 | 04 | Завершено | PR #65 слит: 04-B-2 добавила только осмысленные `alt` четырём существующим `<img>`; `jsx-a11y/alt-text` = 0, React keys, DOM/CSS/API/runtime, production, Supabase Cloud, OpenAI и Modal не менялись | PR #65 / `a23d425` |
 | 2026-07-18 | 04 | Завершено | PR #62 слит: 04-B-1 механически добавила стабильные React keys для 13 JSX-итераций в `src/app/dashboard.tsx`; `react/jsx-key` = 0, DOM/CSS/API/runtime, production, OpenAI и Modal не менялись | PR #62 / `104bc59` |
@@ -111,7 +112,6 @@
 | 2026-07-17 | 00 | Завершено | Geist Sans и Geist Mono переведены с build-time Google Fonts на локальный пакет того же шрифта для воспроизводимой сборки Codex Cloud | PR #44 |
 | 2026-07-17 | 05 | В работе | Подготовлен gated runbook reconciliation migration history с read-only preflight, staging, backup, rollback и ручными разрешениями без изменения production | draft PR |
 | 2026-07-17 | 00 | В работе | Общая память синхронизирована с `main` `4434803`; закрытые P0 удалены, следующий этап — безопасный migration-history reconciliation | draft PR |
-| 2026-07-17 | 05 | В работе | Добавлена изолированная CI-проверка полного Supabase migration chain, Atlas schema/RLS/policies и отсутствия будущих полей без подключения к production | draft PR |
 
 ## Шаблон передачи состояния после работы
 
