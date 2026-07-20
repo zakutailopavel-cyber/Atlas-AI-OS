@@ -8,7 +8,7 @@
 - Production: https://atlas.epkoolitus.ee
 - Основной стек: Next.js 16, React 19, TypeScript, Supabase, Vercel, Modal GPU, OpenAI API.
 - Основная ветка: `main`.
-- Подтверждённый снимок `main`: `3bc3b2b` от 2026-07-19 — PR #73 завершил additive nullable tenant bridge; без backfill, RLS cutover, production/Supabase Cloud, DOM/CSS/API/runtime, OpenAI и Modal.
+- Подтверждённый снимок `main`: `c5b450b` от 2026-07-19 — PR #75 завершил 05-K documentation-only ownership backfill plan; backfill, production/Supabase Cloud, RLS cutover, OpenAI и Modal не запускались.
 - Production на момент проверки 2026-07-13 отвечает и перенаправляет неавторизованного пользователя на `/login`.
 
 ## Как пользоваться этим файлом
@@ -46,23 +46,25 @@
 
 | Область | Ответственность | Текущее состояние | Ближайший фокус |
 | --- | --- | --- | --- |
-| 00 — Координатор | Архитектура, приоритеты, roadmap, контроль PR | 00-G: подтверждённый `main` — `3bc3b2b`; PR #73 слит, открытых PR на момент синхронизации нет | Сначала завершить tenant/workspace boundary и роли помощников, затем Content Pipeline v1; Fan Interaction Assistant, Cost Governor и Funnel Analytics вводить только следующими узкими этапами |
+| 00 — Координатор | Архитектура, приоритеты, roadmap, контроль PR | 00-H: подтверждённый `main` — `c5b450b`; PR #75 и 05-K завершены, открытых PR на момент стартовой проверки Issue #76 нет | Следующий безопасный этап области 05 — отдельная counts-only read-only preflight specification и изолированный rehearsal без production; production execution запрещён без backup/PITR gate |
 | 01 — AI-модели и Character Brain | Профили, внешность, seed, эталонное лицо, память | Подготовлен контракт Character Brain v1: обязательные поля, immutable facts, versioned memory, visual identity, voice и минимальные payload | Реализовать server-side legacy adapter без изменения данных |
 | 02 — Сцены и референсы | Modal, IP-Adapter/InstantID, сцены, улучшение, кэш | Подготовлен reference-first контракт: versioned источники, metadata, лицензии, change regions, подбор, дедупликация и QA лица/сцены | Согласовать целевую схему и реализовать ingest + cache preflight без GPU |
 | 03 — Контент-фабрика | Публикации, тексты, изображения, материалы, календарь | Подготовлен контракт Content Pipeline v1: единый lifecycle, ручной approval, межобластные payload и idempotency генерации/публикации | Согласовать статусы и реализовать server-side revisions + approval gate без изменения UI |
 | 04 — Интерфейс Atlas | Дизайн, адаптивность, модальные окна, карточки | 04-B-1, 04-B-2 и 04-B-3 завершены; PR #69 устранил 2 ошибки `react-hooks/purity`, соответствующий baseline удалён; осталось 2 ошибки `react-hooks/set-state-in-effect` | Отдельно устранить только `set-state-in-effect`, сохранив текущее поведение и не меняя DOM/CSS/API/runtime |
-| 05 — Backend и инфраструктура | Supabase, Storage, RLS, Vercel, Modal, auth, расходы | 05-K: подготовлен documentation-only ownership backfill plan с ручным назначением workspace каждой модели, parent-only наследованием и quarantine; execution не разрешён | Подготовить отдельную counts-only read-only preflight specification и rehearsal без production; `created_by` никогда автоматически не использовать как `owner_id` |
+| 05 — Backend и инфраструктура | Supabase, Storage, RLS, Vercel, Modal, auth, расходы | 05-K завершена и PR #75 слит: documentation-only ownership backfill plan фиксирует ручное назначение workspace каждой модели, parent-only наследование и quarantine; backfill не выполнялся | Подготовить отдельную counts-only read-only preflight specification и изолированный rehearsal без production; production execution и RLS cutover запрещены без backup/PITR gate, `created_by` нельзя автоматически использовать как `owner_id` |
 
 ## Открытые PR и решения
 
 - PR #71 слит в `main`: `docs/PRODUCT_STRATEGY.md` стал активным roadmap — один персонаж до подтверждённой экономики, ручные compliance/approval gates и последовательное внедрение Assistant, Cost Governor и Funnel Analytics.
 - PR #73 слит в `main`: 05-J добавила nullable `owner_id` bridge в `ai_models`, `generation_jobs` и `model_references` без backfill, RLS cutover и production-доступа; `created_by` запрещено автоматически использовать как `owner_id`.
+- PR #75 слит в `main`: 05-K завершила documentation-only ownership backfill plan; backfill, production/Supabase Cloud, RLS cutover, OpenAI и Modal не запускались.
 - PR #53 слит в `main`: Project state workflow запускается на каждом PR.
 - PR #67 слит в `main`: lint non-regression baseline обязателен внутри required check `build`; новые findings сверх baseline блокируют merge.
 - PR #69 слит в `main`: `react-hooks/purity` = 0; lint baseline уменьшен до двух ошибок `react-hooks/set-state-in-effect` и восьми предупреждений.
 - PR #51 слит в `main`: добавлены Atlas issue/PR templates и workflow проверки PROJECT_STATE.md.
 - PR #50 закрыт без merge.
-- PR #44, #45, #46, #47, #49, #51, #53, #55, #57, #58, #60, #62, #64, #65, #66, #67, #69, #70, #71, #72 и #73 слиты в `main`; актуальный подтверждённый `main` — `3bc3b2b`.
+- PR #44, #45, #46, #47, #49, #51, #53, #55, #57, #58, #60, #62, #64, #65, #66, #67, #69, #70, #71, #72, #73 и #75 слиты в `main`; актуальный подтверждённый `main` — `c5b450b`.
+- На момент стартовой проверки Issue #76 открытых PR не было.
 - Issue #56 выполнена и PR #57 слит; Issue #59 закрыт после PR #60: production reconciliation остановлен, потому что Supabase Free Plan не предоставляет backups/PITR.
 - Read-only проверка GitHub ruleset `Protect main` 2026-07-17 подтвердила `active` enforcement для default branch, обязательный PR, запрет branch deletion/non-fast-forward и required status checks `build` + `check-project-state`.
 - Каждый новый PR должен быть узким и относиться к одной области. Межобластные изменения сначала согласуются в области 00.
@@ -82,7 +84,7 @@
 
 ## Текущие приоритеты
 
-1. P0: завершить tenant/workspace boundary и роли помощников без автоматического использования `created_by` как `owner_id`; production cutover остаётся отдельным ручным gate.
+1. P0: подготовить counts-only read-only preflight specification и изолированный rehearsal для ownership backfill; production execution и RLS cutover запрещены без backup/PITR gate, а `created_by` нельзя автоматически использовать как `owner_id`.
 2. P0: реализовать Content Pipeline v1 для одного персонажа — server-side revisions, hash-bound ручной approval и корректное отображение ошибок без автопубликации.
 3. P1: добавить обязательный AI-disclosure в publish payload и ручную проверку актуальных правил/KYC выбранной площадки перед запуском.
 4. P1: реализовать Fan Interaction Assistant только в режиме предложения ответа с ручным подтверждением; авто-DM, авто-PPV и автономная публикация запрещены на первом этапе.
@@ -103,7 +105,8 @@
 
 | Дата | Область | Состояние | Изменение | PR/коммит |
 | --- | --- | --- | --- | --- |
-| 2026-07-19 | 05 | В работе | 05-K зафиксировала безопасный ownership backfill plan: ручной model-to-workspace manifest, наследование content/jobs/references только через parent model, quarantine, counts/invariants/rollback и ручные gates; без SQL, production/Supabase Cloud, RLS cutover, OpenAI и Modal | draft PR |
+| 2026-07-20 | 00 | В работе | 00-H синхронизировала PROJECT_STATE после merge PR #75: подтверждён `main` `c5b450b`, 05-K завершена; backfill, production/Supabase Cloud, RLS cutover, OpenAI и Modal не запускались | Issue #76 / draft PR |
+| 2026-07-19 | 05 | Завершено | PR #75 слит: 05-K зафиксировала documentation-only ownership backfill plan с ручным model-to-workspace manifest, parent-only наследованием, quarantine, counts/invariants/rollback и ручными gates; backfill и production-действия не выполнялись | PR #75 / `c5b450b` |
 | 2026-07-19 | 05 | Завершено | PR #73 слит: 05-J добавила nullable `owner_id` bridge в `ai_models`, `generation_jobs` и `model_references` без backfill, RLS cutover и production-доступа; следующий этап — только read-only ownership-классификация и вручную gated backfill-план без автоматического `created_by` → `owner_id` | PR #73 / `3bc3b2b` |
 | 2026-07-19 | 00 | Завершено | PR #71 слит в `main` `7c04054`: активирована стратегия малого масштаба — один персонаж до подтверждённой экономики, Fanvue как проверяемый кандидат, ручной approval, затем Fan Interaction Assistant, Cost Governor и Funnel Analytics; production и платные API не запускались | PR #71 / `7c04054` |
 | 2026-07-19 | 04 | Завершено | PR #69 слит в `main` `4651d53`: 04-B-3 устранила 2 ошибки `react-hooks/purity`, baseline purity удалён; `set-state-in-effect`, DOM/CSS/API/runtime, production, Supabase Cloud, OpenAI и Modal не менялись | PR #69 / `4651d53` |
@@ -117,7 +120,6 @@
 | 2026-07-17 | 05 | Завершено | PR #49 слит: additive tenant foundation `0900` вошла в `main`; без backfill, runtime/UI, production cutover и production-доступа | PR #49 / `792c35d` |
 | 2026-07-17 | 00 | Завершено | Подтверждён `main` `0022900`: PR #47 слит после PR #44–#46; открыт draft PR #49, его изменения не считаются состоянием `main` | PR #47 / `0022900` |
 | 2026-07-17 | 00 | Завершено | Добавлена корневая инструкция для агентов: обязательный контекст, границы областей, проверки, draft PR и ручные production/GPU/merge gates | PR #46 / `7f107b5` |
-| 2026-07-17 | 05 | Завершено | Зафиксировано evidence schema equivalence: PR #43 закрыт без merge, diagnostic run `29589401343` успешен, clean chain и production/local hashes совпали; следующий gate — rehearsal bootstrap history без production | PR #45 / `833c461` |
 
 ## Шаблон передачи состояния после работы
 
