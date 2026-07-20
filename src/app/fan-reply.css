@@ -1,6 +1,19 @@
-.fan-reply-hint{color:#70746d;font-size:11px;margin:-8px 0 16px}
-.fan-reply-result{background:#e6eee4;padding:15px;border-radius:10px;margin-top:18px}
-.fan-reply-result p{margin:8px 0;white-space:pre-wrap}
-.fan-reply-result small{color:#777}
-.fan-reply-flag{background:#f8e4e1;border:1px solid #efc8c2}
-.fan-reply-flag b{display:block;color:#9b4037;margin-bottom:8px}
+.fan-reply-layout{display:grid;grid-template-columns:1fr 1fr;gap:22px;align-items:start}
+.fan-reply-panel{background:#faf9f6;border:1px solid #dfdcd5;border-radius:16px;padding:24px}
+.fan-reply-panel h2{margin:0 0 6px}
+.fan-reply-hint{color:#70746d;font-size:11px;margin:0 0 16px}
+.fan-reply-model-card{display:flex;align-items:center;gap:12px;background:white;border:1px solid #e7e4dd;border-radius:12px;padding:12px 14px;margin-bottom:16px}
+.fan-reply-model-card img{width:38px;height:38px;border-radius:50%;object-fit:cover}
+.fan-reply-avatar-fallback{width:38px;height:38px;border-radius:50%;background:#d5ac94;color:white;display:grid;place-items:center;font-weight:bold;font-size:12px}
+.fan-reply-model-card b{display:block;font-size:12px}
+.fan-reply-model-card span{display:block;font-size:10px;color:#777}
+.fan-reply-preview{min-height:260px;display:flex;flex-direction:column;justify-content:flex-end;gap:12px}
+.fan-reply-empty{margin:auto;text-align:center;color:#a8a49a;font-size:11px;max-width:220px;line-height:1.6}
+.fan-reply-pulse{animation:fan-reply-pulse 1.4s ease-in-out infinite}
+@keyframes fan-reply-pulse{0%,100%{opacity:.45}50%{opacity:1}}
+.fan-reply-bubble{background:#303630;color:white;border-radius:16px 16px 16px 4px;padding:14px 16px;font-size:13px;line-height:1.55;white-space:pre-wrap}
+.fan-reply-tone{font-size:10px;color:#a8a49a;padding-left:4px}
+.fan-reply-flag{display:flex;gap:8px;align-items:flex-start;background:#f8e4e1;color:#9b4037;border:1px solid #efc8c2;border-radius:10px;padding:10px 12px;font-size:11px;line-height:1.5}
+.fan-reply-actions{display:flex}
+.fan-reply-copy{width:auto!important;background:#ddb9a3!important;color:#342f2c!important;padding:9px 16px!important;font-size:10px!important;font-weight:bold}
+@media(max-width:800px){.fan-reply-layout{grid-template-columns:1fr}}

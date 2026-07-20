@@ -508,6 +508,7 @@ function FanReply({ models }: { models: Model[] }) {
     [message, setMessage] = useState(""),
     [loading, setLoading] = useState(false),
     [error, setError] = useState(""),
+    [copied, setCopied] = useState(false),
     [result, setResult] = useState<{
       reply: string;
       tone_notes: string;
@@ -519,6 +520,7 @@ function FanReply({ models }: { models: Model[] }) {
     setLoading(true);
     setError("");
     setResult(null);
+    setCopied(false);
     try {
       const r = await fetch("/api/fan-reply", {
         method: "POST",
@@ -534,58 +536,91 @@ function FanReply({ models }: { models: Model[] }) {
       setLoading(false);
     }
   }
+  async function copy() {
+    if (!result) return;
+    await navigator.clipboard.writeText(result.reply);
+    setCopied(true);
+  }
   return (
-    <div className="settings">
-      <h2>Fan Interaction Assistant</h2>
-      <p className="fan-reply-hint">
-        Черновик ответа фанату в голосе персонажа. Ничего не отправляется
-        автоматически — скопируй и отправь вручную после проверки.
-      </p>
-      <div className="form">
-        <label>
-          AI-модель
-          <select
-            value={modelId}
-            onChange={(e) => setModelId(e.target.value)}
-          >
-            {models.map((m) => (
-              <option key={m.id} value={m.id}>
-                {m.name}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label>
-          Сообщение фаната
-          <textarea
-            value={message}
-            onChange={(e) => setMessage(e.target.value)}
-            placeholder="Вставь сообщение, на которое нужен черновик ответа…"
-          />
-        </label>
-        <button onClick={send} disabled={loading || !model || !message.trim()}>
-          {loading ? "Думаем…" : "✦ Предложить ответ"}
-        </button>
-        {error && <strong className="generation-error">{error}</strong>}
+    <div className="fan-reply-layout">
+      <div className="fan-reply-panel">
+        <h2>Fan Interaction Assistant</h2>
+        <p className="fan-reply-hint">
+          Черновик ответа фанату в голосе персонажа. Ничего не отправляется
+          автоматически — скопируй и отправь вручную после проверки.
+        </p>
+        {model && (
+          <div className="fan-reply-model-card">
+            <span className="fan-reply-avatar-fallback">
+              {model.name.slice(0, 2).toUpperCase()}
+            </span>
+            <div>
+              <b>{model.name}</b>
+              <span>{model.niche || "Ниша не указана"}</span>
+            </div>
+          </div>
+        )}
+        <div className="form">
+          <label>
+            AI-модель
+            <select
+              value={modelId}
+              onChange={(e) => setModelId(e.target.value)}
+            >
+              {models.map((m) => (
+                <option key={m.id} value={m.id}>
+                  {m.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            Сообщение фаната
+            <textarea
+              value={message}
+              onChange={(e) => setMessage(e.target.value)}
+              placeholder="Вставь сообщение, на которое нужен черновик ответа…"
+            />
+          </label>
+          <button onClick={send} disabled={loading || !model || !message.trim()}>
+            {loading ? "Думаем…" : "✦ Предложить ответ"}
+          </button>
+          {error && <strong className="generation-error">{error}</strong>}
+        </div>
       </div>
-      {result && (
-        <section
-          className={
-            result.needs_human_review
-              ? "fan-reply-result fan-reply-flag"
-              : "fan-reply-result"
-          }
-        >
-          {result.needs_human_review && (
-            <b>
-              ⚠ Похоже на намерение купить/пожаловаться — ответь лично, не
-              отправляй как есть
-            </b>
-          )}
-          <p>{result.reply}</p>
-          <small>{result.tone_notes}</small>
-        </section>
-      )}
+      <div className="fan-reply-panel fan-reply-preview">
+        {!result && !loading && (
+          <p className="fan-reply-empty">
+            Здесь появится черновик ответа — выбери модель, вставь сообщение
+            фаната и нажми «Предложить ответ».
+          </p>
+        )}
+        {loading && (
+          <p className="fan-reply-empty fan-reply-pulse">
+            Подбираем тон и формулировку…
+          </p>
+        )}
+        {result && (
+          <>
+            {result.needs_human_review && (
+              <div className="fan-reply-flag">
+                <span>⚠</span>
+                <span>
+                  Похоже на намерение купить или пожаловаться — ответь лично,
+                  не отправляй черновик как есть.
+                </span>
+              </div>
+            )}
+            <div className="fan-reply-bubble">{result.reply}</div>
+            <span className="fan-reply-tone">{result.tone_notes}</span>
+            <div className="fan-reply-actions">
+              <button className="fan-reply-copy" onClick={copy}>
+                {copied ? "✓ Скопировано" : "Скопировать ответ"}
+              </button>
+            </div>
+          </>
+        )}
+      </div>
     </div>
   );
 }
