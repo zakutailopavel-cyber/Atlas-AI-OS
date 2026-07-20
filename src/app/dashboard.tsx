@@ -26,6 +26,7 @@ type Item = {
   created_by: string;
   asset_url?: string | null;
   review_comment?: string | null;
+  disclosure?: string | null;
 };
 type AvatarJob = { id:string; model_id:string; kind:"avatar"|"scene"; prompt:string; style:string; status:string; output_urls:string[] | null; error:string | null; created_at:string };
 type Asset = {id:string;model_id:string;storage_path:string;kind:string;generation_job_id:string|null;created_at:string};
@@ -115,6 +116,7 @@ export default function Dashboard({ user }: { user: User }) {
         publish_at: item.publish_at,
         asset_url: item.asset_url,
         review_comment: item.review_comment,
+        disclosure: item.disclosure,
       })
       .eq("id", item.id);
     setSelectedItem(null);
@@ -970,6 +972,7 @@ function ContentDialog({
       visual_prompt: "",
       shot_list: [],
       publish_at: null,
+      disclosure: "",
     });
   async function generate() {
     const model = models.find((v) => v.id === x.model_id);
@@ -996,6 +999,7 @@ function ContentDialog({
         caption: `${result.hook}\n\n${result.caption}\n\n${result.cta}\n\n${result.hashtags.join(" ")}`,
         visual_prompt: `${result.visual_prompt}\n\nNegative: ${result.negative_prompt}`,
         shot_list: result.shot_list,
+        disclosure: result.disclosure,
       });
       setGenerated(true);
     } catch (error) {
@@ -1092,6 +1096,13 @@ function ContentDialog({
               <textarea
                 value={x.caption || ""}
                 onChange={(e) => setX({ ...x, caption: e.target.value })}
+              />
+            </label>
+            <label>
+              AI-дисклоуз (виден в подписи/профиле)
+              <input
+                value={x.disclosure || ""}
+                onChange={(e) => setX({ ...x, disclosure: e.target.value })}
               />
             </label>
             <label>
@@ -1200,6 +1211,7 @@ function WeekPlanner({
           visual_prompt: String(p.visual_prompt),
           shot_list: p.shot_list as string[],
           publish_at: d.toISOString(),
+          disclosure: String(p.disclosure ?? ""),
         };
       }),
     );
@@ -1349,6 +1361,9 @@ function PublicationDialog({
             )}
           </div>
           <p>{draft.caption}</p>
+          <small className="disclosure-preview">
+            {draft.disclosure || "⚠ Дисклоуз не задан"}
+          </small>
         </div>
       )}
       {tab === "Материалы" && (
@@ -1405,6 +1420,15 @@ function PublicationDialog({
             </b>
             <p>Оставь комментарий для команды или измени статус публикации.</p>
           </div>
+          <label>
+            AI-дисклоуз перед публикацией
+            <input
+              value={draft.disclosure || ""}
+              onChange={(e) =>
+                setDraft({ ...draft, disclosure: e.target.value })
+              }
+            />
+          </label>
           <label>
             Комментарий редактора
             <textarea
