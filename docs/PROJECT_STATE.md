@@ -8,7 +8,7 @@
 - Production: https://atlas.epkoolitus.ee
 - Основной стек: Next.js 16, React 19, TypeScript, Supabase, Vercel, Modal GPU, OpenAI API.
 - Основная ветка: `main`.
-- Подтверждённый снимок `main`: `4921e5b` от 2026-07-20 — PR #77 синхронизировал состояние после PR #75; production/Supabase Cloud, RLS cutover, OpenAI и Modal не запускались.
+- Подтверждённый снимок `main`: `ab7a745` от 2026-07-20 — PR #78 перевёл активную стратегию Atlas на портфель из 10 AI-персонажей; production/Supabase Cloud, RLS cutover, OpenAI, Modal и социальные платформы не затрагивались.
 - Production на момент проверки 2026-07-13 отвечает и перенаправляет неавторизованного пользователя на `/login`.
 
 ## Как пользоваться этим файлом
@@ -48,7 +48,7 @@
 
 | Область | Ответственность | Текущее состояние | Ближайший фокус |
 | --- | --- | --- | --- |
-| 00 — Координатор | Архитектура, приоритеты, roadmap, контроль PR | 00-I: стратегия переведена на целевую ёмкость 10 раздельных AI-персонажей с поэтапной активацией `1 → 3 → 10`, единым верифицированным владельцем и обязательным AI-disclosure; состояние остаётся документационным до merge draft PR | Следующий этап — 04-C: портфельный интерфейс управления 10 персонажами с раздельными Brain/reference/voice/niche, бюджетами, compliance и аналитикой |
+| 00 — Координатор | Архитектура, приоритеты, roadmap, контроль PR | 00-I завершена и PR #78 слит: активная стратегия рассчитана на 10 раздельных AI-персонажей с поэтапной активацией `1 → 3 → 10`, единым верифицированным владельцем и обязательным AI-disclosure | 04-C: портфельный интерфейс управления 10 персонажами с раздельными Brain/reference/voice/niche, бюджетами, compliance и аналитикой |
 | 01 — AI-модели и Character Brain | Профили, внешность, seed, эталонное лицо, память | Подготовлен контракт Character Brain v1: обязательные поля, immutable facts, versioned memory, visual identity, voice и минимальные payload | Реализовать server-side legacy adapter без изменения данных |
 | 02 — Сцены и референсы | Modal, IP-Adapter/InstantID, сцены, улучшение, кэш | Подготовлен reference-first контракт: versioned источники, metadata, лицензии, change regions, подбор, дедупликация и QA лица/сцены | Согласовать целевую схему и реализовать ingest + cache preflight без GPU |
 | 03 — Контент-фабрика | Публикации, тексты, изображения, материалы, календарь | Подготовлен контракт Content Pipeline v1: единый lifecycle, ручной approval, межобластные payload и idempotency генерации/публикации | Согласовать статусы и реализовать server-side revisions + approval gate без изменения UI |
@@ -57,7 +57,8 @@
 
 ## Открытые PR и решения
 
-- PR #71 слит в `main`: `docs/PRODUCT_STRATEGY.md` стал активным roadmap — один персонаж до подтверждённой экономики, ручные compliance/approval gates и последовательное внедрение Assistant, Cost Governor и Funnel Analytics.
+- PR #78 слит в `main`: активная стратегия и roadmap переведены на портфель из 10 различимых и identity-consistent AI-персонажей с отдельными ресурсами, этапами `1 → 3 → 10` и запретом ban-evasion инфраструктуры.
+- PR #71 слит в `main`: зафиксировал исходную стратегию малого масштаба и ручные compliance/approval gates; целевая ёмкость одного персонажа позднее заменена портфельной стратегией PR #78.
 - PR #73 слит в `main`: 05-J добавила nullable `owner_id` bridge в `ai_models`, `generation_jobs` и `model_references` без backfill, RLS cutover и production-доступа; `created_by` запрещено автоматически использовать как `owner_id`.
 - PR #75 слит в `main`: 05-K завершила documentation-only ownership backfill plan; backfill, production/Supabase Cloud, RLS cutover, OpenAI и Modal не запускались.
 - PR #53 слит в `main`: Project state workflow запускается на каждом PR.
@@ -65,8 +66,8 @@
 - PR #69 слит в `main`: `react-hooks/purity` = 0; lint baseline уменьшен до двух ошибок `react-hooks/set-state-in-effect` и восьми предупреждений.
 - PR #51 слит в `main`: добавлены Atlas issue/PR templates и workflow проверки PROJECT_STATE.md.
 - PR #50 закрыт без merge.
-- PR #44, #45, #46, #47, #49, #51, #53, #55, #57, #58, #60, #62, #64, #65, #66, #67, #69, #70, #71, #72, #73 и #75 слиты в `main`; актуальный подтверждённый `main` — `c5b450b`.
-- На момент стартовой проверки Issue #76 открытых PR не было.
+- PR #44, #45, #46, #47, #49, #51, #53, #55, #57, #58, #60, #62, #64, #65, #66, #67, #69, #70, #71, #72, #73, #75, #77 и #78 слиты в `main`; актуальный подтверждённый `main` — `ab7a745`.
+- На момент стартовой проверки 00-J открытых PR не было.
 - Issue #56 выполнена и PR #57 слит; Issue #59 закрыт после PR #60: production reconciliation остановлен, потому что Supabase Free Plan не предоставляет backups/PITR.
 - Read-only проверка GitHub ruleset `Protect main` 2026-07-17 подтвердила `active` enforcement для default branch, обязательный PR, запрет branch deletion/non-fast-forward и required status checks `build` + `check-project-state`.
 - Каждый новый PR должен быть узким и относиться к одной области. Межобластные изменения сначала согласуются в области 00.
@@ -108,7 +109,7 @@
 
 | Дата | Область | Состояние | Изменение | PR/коммит |
 | --- | --- | --- | --- | --- |
-| 2026-07-20 | 00 | В работе | 00-I переводит стратегию Atlas на портфель из 10 различимых и identity-consistent AI-персонажей: отдельные Brain/reference/voice/niche, бюджеты и аналитика, один верифицированный владелец, официальный AI-disclosure и этапы `1 → 3 → 10`; ban-evasion, ложные личности, proxy/device-fingerprint инфраструктура и искусственная координация запрещены; следующий этап — 04-C | Task 00-I / draft PR |
+| 2026-07-20 | 00 | Завершено | 00-J синхронизировала состояние после merge PR #78: подтверждён `main` `ab7a745`, портфельная стратегия 10 персонажей активна, открытых PR нет; следующий этап — 04-C; production, Supabase Cloud, OpenAI, Modal и социальные платформы не затрагивались | PR #78 / `ab7a745` |
 | 2026-07-20 | 00 | В работе | 00-H синхронизировала PROJECT_STATE после merge PR #75: подтверждён `main` `c5b450b`, 05-K завершена; backfill, production/Supabase Cloud, RLS cutover, OpenAI и Modal не запускались | Issue #76 / draft PR |
 | 2026-07-19 | 05 | Завершено | PR #75 слит: 05-K зафиксировала documentation-only ownership backfill plan с ручным model-to-workspace manifest, parent-only наследованием, quarantine, counts/invariants/rollback и ручными gates; backfill и production-действия не выполнялись | PR #75 / `c5b450b` |
 | 2026-07-19 | 05 | Завершено | PR #73 слит: 05-J добавила nullable `owner_id` bridge в `ai_models`, `generation_jobs` и `model_references` без backfill, RLS cutover и production-доступа; следующий этап — только read-only ownership-классификация и вручную gated backfill-план без автоматического `created_by` → `owner_id` | PR #73 / `3bc3b2b` |
