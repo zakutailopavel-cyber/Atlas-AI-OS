@@ -10,6 +10,7 @@ import "./avatar.css";
 import "./character.css";
 import "./library.css";
 import "./refinement.css";
+import "./fan-reply.css";
 
 export const metadata: Metadata = {
   title: "Atlas AI OS",

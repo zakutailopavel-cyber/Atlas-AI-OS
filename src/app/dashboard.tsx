@@ -36,6 +36,7 @@ const menu = [
   "Календарь",
   "Команда",
   "Настройки",
+  "Фан-чат",
 ];
 export default function Dashboard({ user }: { user: User }) {
   const s = useMemo(() => createClient(), []),
@@ -135,7 +136,7 @@ export default function Dashboard({ user }: { user: User }) {
               className={page === n ? "active" : ""}
               onClick={() => setPage(n)}
             >
-              {["▦", "♙", "✦", "▦", "♙", "⚙"][i]} {n}
+              {["▦", "♙", "✦", "▦", "♙", "⚙", "✉"][i]} {n}
             </button>
           ))}
         </nav>
@@ -187,7 +188,8 @@ export default function Dashboard({ user }: { user: User }) {
           )}{" "}
           {page === "Календарь" && <Calendar items={items} />}{" "}
           {page === "Команда" && <Team team={team} />}{" "}
-          {page === "Настройки" && <Settings user={user} />}
+          {page === "Настройки" && <Settings user={user} />}{" "}
+          {page === "Фан-чат" && <FanReply models={models} />}
         </div>
       </main>
       {modelOpen !== undefined && (
@@ -498,6 +500,92 @@ function Settings({ user }: { user: User }) {
           требует авторизации.
         </p>
       </section>
+    </div>
+  );
+}
+function FanReply({ models }: { models: Model[] }) {
+  const [modelId, setModelId] = useState(models[0]?.id || ""),
+    [message, setMessage] = useState(""),
+    [loading, setLoading] = useState(false),
+    [error, setError] = useState(""),
+    [result, setResult] = useState<{
+      reply: string;
+      tone_notes: string;
+      needs_human_review: boolean;
+    } | null>(null);
+  const model = models.find((m) => m.id === modelId);
+  async function send() {
+    if (!model || !message.trim()) return;
+    setLoading(true);
+    setError("");
+    setResult(null);
+    try {
+      const r = await fetch("/api/fan-reply", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ model, fan_message: message }),
+      });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error || "Не удалось получить ответ");
+      setResult(d);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Ошибка ассистента");
+    } finally {
+      setLoading(false);
+    }
+  }
+  return (
+    <div className="settings">
+      <h2>Fan Interaction Assistant</h2>
+      <p className="fan-reply-hint">
+        Черновик ответа фанату в голосе персонажа. Ничего не отправляется
+        автоматически — скопируй и отправь вручную после проверки.
+      </p>
+      <div className="form">
+        <label>
+          AI-модель
+          <select
+            value={modelId}
+            onChange={(e) => setModelId(e.target.value)}
+          >
+            {models.map((m) => (
+              <option key={m.id} value={m.id}>
+                {m.name}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label>
+          Сообщение фаната
+          <textarea
+            value={message}
+            onChange={(e) => setMessage(e.target.value)}
+            placeholder="Вставь сообщение, на которое нужен черновик ответа…"
+          />
+        </label>
+        <button onClick={send} disabled={loading || !model || !message.trim()}>
+          {loading ? "Думаем…" : "✦ Предложить ответ"}
+        </button>
+        {error && <strong className="generation-error">{error}</strong>}
+      </div>
+      {result && (
+        <section
+          className={
+            result.needs_human_review
+              ? "fan-reply-result fan-reply-flag"
+              : "fan-reply-result"
+          }
+        >
+          {result.needs_human_review && (
+            <b>
+              ⚠ Похоже на намерение купить/пожаловаться — ответь лично, не
+              отправляй как есть
+            </b>
+          )}
+          <p>{result.reply}</p>
+          <small>{result.tone_notes}</small>
+        </section>
+      )}
     </div>
   );
 }
