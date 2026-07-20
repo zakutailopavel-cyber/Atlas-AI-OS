@@ -215,6 +215,7 @@ export default function Dashboard({ user }: { user: User }) {
           model={models.find((m) => m.id === selectedItem.model_id)}
           close={() => setSelectedItem(null)}
           save={updateItem}
+          onApproved={load}
         />
       )}
       {weekOpen && (
@@ -1305,14 +1306,47 @@ function PublicationDialog({
   model,
   close,
   save,
+  onApproved,
 }: {
   item: Item;
   model?: Model;
   close: () => void;
   save: (x: Partial<Item>) => void;
+  onApproved: () => void;
 }) {
   const [draft, setDraft] = useState<Partial<Item>>(item),
-    [tab, setTab] = useState("Предпросмотр");
+    [tab, setTab] = useState("Предпросмотр"),
+    [approving, setApproving] = useState(false),
+    [approveError, setApproveError] = useState("");
+  async function approve() {
+    setApproving(true);
+    setApproveError("");
+    try {
+      const r = await fetch("/api/approve", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          content_item_id: item.id,
+          title: draft.title,
+          caption: draft.caption,
+          visual_prompt: draft.visual_prompt,
+          disclosure: draft.disclosure,
+          asset_url: draft.asset_url,
+          review_comment: draft.review_comment,
+        }),
+      });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error || "Не удалось согласовать");
+      onApproved();
+      close();
+    } catch (e) {
+      setApproveError(
+        e instanceof Error ? e.message : "Ошибка согласования",
+      );
+    } finally {
+      setApproving(false);
+    }
+  }
   return (
     <Modal close={close}>
       <div className="publication-head">
@@ -1329,7 +1363,9 @@ function PublicationDialog({
         >
           <option value="draft">Черновик</option>
           <option value="review">На проверке</option>
-          <option value="ready">Согласовано</option>
+          <option value="ready" disabled>
+            Согласовано (только через вкладку «Согласование»)
+          </option>
           <option value="published">Опубликовано</option>
         </select>
       </div>
@@ -1439,12 +1475,15 @@ function PublicationDialog({
               placeholder="Что изменить или проверить?"
             />
           </label>
+          {approveError && (
+            <strong className="generation-error">{approveError}</strong>
+          )}
           <div className="approval-buttons">
             <button onClick={() => setDraft({ ...draft, status: "review" })}>
               Вернуть на проверку
             </button>
-            <button onClick={() => setDraft({ ...draft, status: "ready" })}>
-              ✓ Согласовать
+            <button onClick={approve} disabled={approving}>
+              {approving ? "Согласуем…" : "✓ Согласовать"}
             </button>
           </div>
         </div>
