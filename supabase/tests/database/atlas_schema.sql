@@ -2,7 +2,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 
-select plan(33);
+select plan(32);
 
 select has_table('public', 'profiles', 'profiles exists');
 select has_table('public', 'ai_models', 'ai_models exists');
@@ -387,17 +387,12 @@ select is(
   'legacy broad content_items policies are still present for pre-cutover compatibility'
 );
 
-select is(
-  (
-    select count(*)::integer
-    from information_schema.tables
-    where table_schema = 'public'
-      and table_type = 'BASE TABLE'
-      and table_name like '%approval%'
-  ),
-  0,
-  'approval tables remain absent in tenant foundation PR'
-);
+-- The 'approval tables remain absent in tenant foundation PR' guard
+-- that used to live here was specific to verifying the 202607170900
+-- tenant-foundation migration in isolation. Content Pipeline v1
+-- (202607202300) intentionally introduces public.content_approvals, so
+-- that guard is obsolete now rather than violated; removed instead of
+-- widening it into a wildcard exception.
 
 select is(
   (
