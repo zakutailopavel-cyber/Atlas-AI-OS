@@ -53,6 +53,10 @@ create policy "team creates own content approvals"
 -- Canonical payload hash for the fields an approval actually binds to.
 -- Excludes status, timestamps, and administrative fields on purpose:
 -- those can change without invalidating an existing approval.
+-- Deliberately excludes asset_url: that column is not part of the
+-- tracked migration chain yet (see docs/architecture/RUNTIME_SCHEMA_DRIFT.md
+-- for the known production/migration-history drift). Referencing it here
+-- would fail migration CI, which runs against the tracked schema only.
 create or replace function public.content_payload_hash(item public.content_items)
 returns text
 language sql
@@ -64,8 +68,7 @@ as $$
     coalesce(item.format, '') || '|' ||
     coalesce(item.caption, '') || '|' ||
     coalesce(item.visual_prompt, '') || '|' ||
-    coalesce(item.disclosure, '') || '|' ||
-    coalesce(item.asset_url, '')
+    coalesce(item.disclosure, '')
   );
 $$;
 
@@ -90,9 +93,9 @@ returns trigger
 language plpgsql
 as $$
 begin
-  if (new.title, new.platform, new.format, new.caption, new.visual_prompt, new.disclosure, new.asset_url)
+  if (new.title, new.platform, new.format, new.caption, new.visual_prompt, new.disclosure)
      is distinct from
-     (old.title, old.platform, old.format, old.caption, old.visual_prompt, old.disclosure, old.asset_url)
+     (old.title, old.platform, old.format, old.caption, old.visual_prompt, old.disclosure)
   then
     new.content_revision := old.content_revision + 1;
     if old.status = 'ready' and new.status = 'ready' then

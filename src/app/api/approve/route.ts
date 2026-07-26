@@ -39,8 +39,11 @@ export async function POST(request: Request) {
       caption: body.caption,
       visual_prompt: body.visual_prompt,
       disclosure: body.disclosure,
-      asset_url: body.asset_url,
-      review_comment: body.review_comment,
+      // asset_url/review_comment intentionally excluded: not part of the
+      // tracked migration chain yet (docs/architecture/RUNTIME_SCHEMA_DRIFT.md).
+      // The hash this route computes below only covers columns that are
+      // actually in the tracked schema, so it must stay in sync with this
+      // update payload.
     })
     .eq("id", body.content_item_id);
   if (updateError) {
