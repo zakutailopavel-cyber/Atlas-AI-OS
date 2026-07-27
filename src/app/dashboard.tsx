@@ -27,6 +27,7 @@ type Item = {
   asset_url?: string | null;
   review_comment?: string | null;
   disclosure?: string | null;
+  tracking_destination_url?: string | null;
 };
 type AvatarJob = { id:string; model_id:string; kind:"avatar"|"scene"; prompt:string; style:string; status:string; output_urls:string[] | null; error:string | null; created_at:string };
 type Asset = {id:string;model_id:string;storage_path:string;kind:string;generation_job_id:string|null;created_at:string};
@@ -50,11 +51,12 @@ export default function Dashboard({ user }: { user: User }) {
     [modelOpen, setModelOpen] = useState<Model | null | undefined>(),
     [contentOpen, setContentOpen] = useState(false),
     [avatarOpen, setAvatarOpen] = useState(false),
-    [weekOpen, setWeekOpen] = useState(false);
+    [weekOpen, setWeekOpen] = useState(false),
+    [linkClicks, setLinkClicks] = useState<Record<string, number>>({});
   const [selectedItem, setSelectedItem] = useState<Item | null>(null);
   async function load() {
     setLoading(true);
-    const [m, c, t, a] = await Promise.all([
+    const [m, c, t, a, lc] = await Promise.all([
       s.from("ai_models").select("*").order("created_at"),
       s
         .from("content_items")
@@ -62,11 +64,17 @@ export default function Dashboard({ user }: { user: User }) {
         .order("created_at", { ascending: false }),
       s.from("profiles").select("email,role").order("created_at"),
       s.from("model_references").select("*").order("created_at",{ascending:false}),
+      s.from("link_clicks").select("content_item_id"),
     ]);
     setModels(m.data || []);
     setItems(c.data || []);
     setTeam(t.data || []);
     setAssets(a.data||[]);
+    const clickCounts: Record<string, number> = {};
+    for (const row of lc.data || []) {
+      clickCounts[row.content_item_id] = (clickCounts[row.content_item_id] || 0) + 1;
+    }
+    setLinkClicks(clickCounts);
     setLoading(false);
   }
   useEffect(() => {
@@ -117,6 +125,7 @@ export default function Dashboard({ user }: { user: User }) {
         asset_url: item.asset_url,
         review_comment: item.review_comment,
         disclosure: item.disclosure,
+        tracking_destination_url: item.tracking_destination_url,
       })
       .eq("id", item.id);
     setSelectedItem(null);
@@ -216,6 +225,7 @@ export default function Dashboard({ user }: { user: User }) {
           close={() => setSelectedItem(null)}
           save={updateItem}
           onApproved={load}
+          clicks={linkClicks[selectedItem.id] || 0}
         />
       )}
       {weekOpen && (
@@ -1307,17 +1317,26 @@ function PublicationDialog({
   close,
   save,
   onApproved,
+  clicks,
 }: {
   item: Item;
   model?: Model;
   close: () => void;
   save: (x: Partial<Item>) => void;
   onApproved: () => void;
+  clicks: number;
 }) {
   const [draft, setDraft] = useState<Partial<Item>>(item),
     [tab, setTab] = useState("Предпросмотр"),
     [approving, setApproving] = useState(false),
-    [approveError, setApproveError] = useState("");
+    [approveError, setApproveError] = useState(""),
+    [linkCopied, setLinkCopied] = useState(false);
+  const trackingLink =
+    typeof window !== "undefined" ? `${window.location.origin}/api/l/${item.id}` : "";
+  async function copyTrackingLink() {
+    await navigator.clipboard.writeText(trackingLink);
+    setLinkCopied(true);
+  }
   async function approve() {
     setApproving(true);
     setApproveError("");
@@ -1404,6 +1423,26 @@ function PublicationDialog({
       )}
       {tab === "Материалы" && (
         <div className="form">
+          <label>
+            Куда ведёт трафик (Fanvue-профиль, ссылка на подписку и т.п.)
+            <input
+              value={draft.tracking_destination_url || ""}
+              onChange={(e) =>
+                setDraft({ ...draft, tracking_destination_url: e.target.value })
+              }
+              placeholder="https://www.fanvue.com/..."
+            />
+          </label>
+          {draft.tracking_destination_url && (
+            <div className="tracking-link-box">
+              <span>Трек-ссылка для био/подписи:</span>
+              <code>{trackingLink}</code>
+              <button type="button" onClick={copyTrackingLink}>
+                {linkCopied ? "✓ Скопировано" : "Скопировать"}
+              </button>
+              <small>{clicks} клик(ов) зафиксировано</small>
+            </div>
+          )}
           <label>
             Ссылка на готовое изображение
             <input
