@@ -4,7 +4,8 @@
 2. Authenticate: `modal setup`.
 3. Create secret `atlas-supabase` with `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY`.
 4. Create secret `atlas-worker` with `ATLAS_WORKER_SECRET`.
-5. Deploy: `modal deploy modal/atlas_avatar.py`.
-6. Copy the endpoint URL into Vercel as `MODAL_AVATAR_URL`; add the same `ATLAS_WORKER_SECRET` to Vercel.
+5. Create secret `atlas-bfl` with `BFL_API_KEY` (get a key at https://dashboard.bfl.ai — used only for face generation, billed per image by Black Forest Labs, full commercial rights included in the API price, no separate license needed).
+6. Deploy: `modal deploy modal/atlas_avatar.py`.
+7. Copy the endpoint URL into Vercel as `MODAL_AVATAR_URL`; add the same `ATLAS_WORKER_SECRET` to Vercel.
 
-The endpoint acknowledges requests immediately and processes four avatar candidates on an A10G GPU. Results are uploaded to `atlas-assets` and the Supabase job is marked completed.
+The endpoint acknowledges requests immediately. Face generation ("Создать лицо") calls Black Forest Labs' hosted FLUX.1 [dev] API — no GPU involved for this step, since the point was fixing face diversity/quality, not saving compute. Scene generation ("Создать сцену") still runs on a self-hosted SDXL + IP-Adapter pipeline on an A10G GPU, since that step needs face-locked image-to-image conditioning the FLUX API doesn't offer.
