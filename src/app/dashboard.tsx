@@ -66,7 +66,25 @@ export default function Dashboard({ user }: { user: User }) {
       s.from("model_references").select("*").order("created_at",{ascending:false}),
       s.from("link_clicks").select("content_item_id"),
     ]);
-    setModels(m.data || []);
+    const contentCountByModel: Record<string, number> = {};
+    for (const it of c.data || []) {
+      if (it.model_id)
+        contentCountByModel[it.model_id] = (contentCountByModel[it.model_id] || 0) + 1;
+    }
+    function workStage(model: Model): number {
+      const hasContent = (contentCountByModel[model.id] || 0) > 0;
+      const hasAvatar = !!model.visual_passport?.avatar;
+      if (hasContent || model.status === "active") return 0;
+      if (hasAvatar) return 1;
+      return 2;
+    }
+    setModels(
+      [...(m.data || [])].sort((a, b) => {
+        const stageDiff = workStage(a) - workStage(b);
+        if (stageDiff !== 0) return stageDiff;
+        return String(b.created_at).localeCompare(String(a.created_at));
+      }),
+    );
     setItems(c.data || []);
     setTeam(t.data || []);
     setAssets(a.data||[]);
