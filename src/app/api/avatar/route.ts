@@ -29,6 +29,12 @@ const FACE_BLUEPRINTS=[
   "round face, full cheeks, short broad nose, delicate jaw, large downturned eyes",
   "diamond-shaped face, narrow forehead, angular cheekbones, defined jaw, long nose, monolid eyes",
   "square face, broad jaw, subtle cheekbones, straight brows, compact nose, widely spaced eyes",
+  "oblong face, tall forehead, flat cheekbones, wide nose bridge, thin lips, downturned almond eyes",
+  "heart-shaped face, widow's peak, sharp cheekbones, small nose with rounded tip, full lips, hooded eyes",
+  "round face, soft jawline, high round cheeks, button nose, narrow lips, upturned round eyes",
+  "square-oval blend face, angular jaw, moderate cheekbones, straight wide nose, wide mouth, deep-set almond eyes",
+  "narrow triangular face, pointed chin, low flat cheekbones, thin straight nose, thin upper lip, close-set eyes",
+  "broad heart-shaped face, dimpled chin, high wide cheekbones, curved nose bridge, full lower lip, large round eyes",
 ];
 const DISTINCTIVE_DETAILS=[
   "a faint beauty mark below the left eye and slight natural eyebrow asymmetry",
@@ -37,6 +43,12 @@ const DISTINCTIVE_DETAILS=[
   "a small beauty mark on the right cheek and a softly asymmetric smile",
   "a tiny scar through the left eyebrow and slightly uneven eyebrow arches",
   "a defined cupid's bow and a subtly fuller lower lip",
+  "a small gap between the front teeth visible when smiling and freckles on the cheeks",
+  "a faint mole near the right corner of the mouth and slightly hooded left eyelid",
+  "a thin scar along the jawline and naturally arched thick eyebrows",
+  "a dimple on the left cheek only and a slightly crooked nose bridge",
+  "sun-faded freckles across the shoulders and nose and a rounded nose tip",
+  "a subtle birthmark on the neck and slightly uneven natural eyebrow shape",
 ];
 function hash(value:string){return Array.from(value).reduce((result,char)=>(result*31+char.charCodeAt(0))>>>0,2166136261)}
 function identityBlueprint(modelId:string){const value=hash(modelId);return `${FACE_BLUEPRINTS[value%FACE_BLUEPRINTS.length]}, ${DISTINCTIVE_DETAILS[(value>>>8)%DISTINCTIVE_DETAILS.length]}`}
