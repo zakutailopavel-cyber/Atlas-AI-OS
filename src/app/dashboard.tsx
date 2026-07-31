@@ -647,6 +647,8 @@ function ModelDialog({
   save: (m: Partial<Model>) => void;
 }) {
   const [tab, setTab] = useState("Личность"),
+    [appearanceLoading, setAppearanceLoading] = useState(false),
+    [appearanceError, setAppearanceError] = useState(""),
     [m, setM] = useState<Partial<Model>>(() =>
       model || {
         name: "",
@@ -671,6 +673,35 @@ function ModelDialog({
         },
       },
     );
+  async function generateAppearance() {
+    setAppearanceLoading(true);
+    setAppearanceError("");
+    try {
+      const r = await fetch("/api/appearance", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            model: { id: m.id, name: m.name, niche: m.niche, bio: m.bio },
+          }),
+        }),
+        data = await r.json();
+      if (!r.ok) throw new Error(data.error);
+      setM({
+        ...m,
+        visual_passport: {
+          ...m.visual_passport,
+          appearance: data.appearance,
+          seed: String(Math.floor(Math.random() * 900000 + 100000)),
+        },
+      });
+    } catch (e) {
+      setAppearanceError(
+        e instanceof Error ? e.message : "Не удалось сгенерировать внешность",
+      );
+    } finally {
+      setAppearanceLoading(false);
+    }
+  }
   return (
     <Modal close={close}>
       <small>ATLAS CHARACTER BRAIN</small>
@@ -762,6 +793,27 @@ function ModelDialog({
           </label>
           <label>
             Описание внешности
+            <div className="appearance-generate">
+              <button
+                type="button"
+                onClick={generateAppearance}
+                disabled={appearanceLoading}
+              >
+                {appearanceLoading
+                  ? "Генерируем уникальный образ…"
+                  : m.visual_passport?.appearance
+                    ? "↻ Перегенерировать внешность"
+                    : "✦ Сгенерировать внешность"}
+              </button>
+              <small>
+                Atlas придумает уникальную внешность и не повторит образы
+                других моделей. Результат можно поправить вручную ниже —
+                он закрепится за моделью после «Сохранить модель».
+              </small>
+            </div>
+            {appearanceError && (
+              <strong className="generation-error">{appearanceError}</strong>
+            )}
             <textarea
               value={m.visual_passport?.appearance || ""}
               onChange={(e) =>
@@ -773,6 +825,7 @@ function ModelDialog({
                   },
                 })
               }
+              placeholder="Нажми «Сгенерировать внешность» выше или опиши вручную"
             />
           </label>
           <label>
