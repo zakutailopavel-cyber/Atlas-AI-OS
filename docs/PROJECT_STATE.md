@@ -38,10 +38,11 @@
 
 - `src/app/dashboard.tsx` — основной клиентский интерфейс и большая часть пользовательских сценариев.
 - `src/app/api/generate/route.ts` — генерация контент-пакета через OpenAI.
-- `src/app/api/plan-week/route.ts` — недельное планирование контента.
+- `src/app/api/plan-week/route.ts` — недельное планирование контента (площадки: Instagram, TikTok, YouTube Shorts, Telegram, Reddit, X).
+- `src/app/api/trends/route.ts` — опциональный трендовый бриф перед планированием недели (OpenAI Responses + встроенный `web_search`, один вызов, при ошибке пайплайн продолжает без трендов).
 - `src/app/api/avatar/route.ts` — очередь портретов и сцен, связь Supabase с Modal.
 - `modal/atlas_avatar.py` — Modal A10G: RealVisXL для портретов, SDXL + IP-Adapter для сцен, img2img для работы от исходного кадра.
-- Supabase хранит пользователей, AI-модели, контент, задания генерации и материалы; Storage bucket `atlas-assets` используется для изображений.
+- Supabase хранит пользователей, AI-модели, контент, задания генерации, материалы и `social_accounts` (вручную заводимые площадки персонажа — метаданные, без OAuth и без прав на публикацию); Storage bucket `atlas-assets` используется для изображений.
 - Vercel размещает Next.js-приложение; закрытая часть защищена Supabase Auth.
 
 ## Состояние областей
@@ -51,7 +52,7 @@
 | 00 — Координатор | Архитектура, приоритеты, roadmap, контроль PR | 00-I завершена и PR #78 слит: активная стратегия рассчитана на 10 раздельных AI-персонажей с поэтапной активацией `1 → 3 → 10`, единым верифицированным владельцем и обязательным AI-disclosure | 04-C: портфельный интерфейс управления 10 персонажами с раздельными Brain/reference/voice/niche, бюджетами, compliance и аналитикой |
 | 01 — AI-модели и Character Brain | Профили, внешность, seed, эталонное лицо, память | Подготовлен контракт Character Brain v1: обязательные поля, immutable facts, versioned memory, visual identity, voice и минимальные payload | Реализовать server-side legacy adapter без изменения данных |
 | 02 — Сцены и референсы | Modal, IP-Adapter/InstantID, сцены, улучшение, кэш | Подготовлен reference-first контракт: versioned источники, metadata, лицензии, change regions, подбор, дедупликация и QA лица/сцены | Согласовать целевую схему и реализовать ingest + cache preflight без GPU |
-| 03 — Контент-фабрика | Публикации, тексты, изображения, материалы, календарь | Подготовлен контракт Content Pipeline v1: единый lifecycle, ручной approval, межобластные payload и idempotency генерации/публикации | Согласовать статусы и реализовать server-side revisions + approval gate без изменения UI |
+| 03 — Контент-фабрика | Публикации, тексты, изображения, материалы, календарь | Content Pipeline v1 (approval gate) в `main`; draft PR добавил trend-aware генерацию недели (`/api/trends` → валидация по forbidden_topics/disclosure → существующий `/api/plan-week`), `social_accounts` как источник списка площадок, статические инструкции по загрузке и `PostTextEditor` вместо простых textarea для caption/prompt/комментария | После merge: собрать метрики использования трендового шага и решить, нужен ли отдельный UI для истории trend-брифов |
 | 04 — Интерфейс Atlas | Дизайн, адаптивность, модальные окна, карточки | 04-B-1, 04-B-2 и 04-B-3 завершены; PR #69 устранил 2 ошибки `react-hooks/purity`, соответствующий baseline удалён; осталось 2 ошибки `react-hooks/set-state-in-effect` | Отдельно устранить только `set-state-in-effect`, сохранив текущее поведение и не меняя DOM/CSS/API/runtime |
 | 05 — Backend и инфраструктура | Supabase, Storage, RLS, Vercel, Modal, auth, расходы | 05-K завершена и PR #75 слит: documentation-only ownership backfill plan фиксирует ручное назначение workspace каждой модели, parent-only наследование и quarantine; backfill не выполнялся | Подготовить отдельную counts-only read-only preflight specification и изолированный rehearsal без production; production execution и RLS cutover запрещены без backup/PITR gate, `created_by` нельзя автоматически использовать как `owner_id` |
 
@@ -109,6 +110,7 @@
 
 | Дата | Область | Состояние | Изменение | PR/коммит |
 | --- | --- | --- | --- | --- |
+| 2026-07-31 | 03 | В работе | Draft PR: trend-aware генерация недели (`/api/trends` с `web_search`, один вызов на пайплайн) → локальная проверка на forbidden_topics/disclosure → существующий `/api/plan-week` без изменений логики; добавлена `social_accounts` (метаданные площадок, без OAuth/автопостинга — публикация остаётся ручной) и статические инструкции по загрузке; caption/prompt/review_comment переведены на `PostTextEditor` (автовысота, счётчик символов по лимиту площадки); build/lint без новых ошибок сверх baseline | draft PR |
 | 2026-07-20 | 00 | Завершено | 00-J синхронизировала состояние после merge PR #78: подтверждён `main` `ab7a745`, портфельная стратегия 10 персонажей активна, открытых PR нет; следующий этап — 04-C; production, Supabase Cloud, OpenAI, Modal и социальные платформы не затрагивались | PR #78 / `ab7a745` |
 | 2026-07-20 | 00 | В работе | 00-H синхронизировала PROJECT_STATE после merge PR #75: подтверждён `main` `c5b450b`, 05-K завершена; backfill, production/Supabase Cloud, RLS cutover, OpenAI и Modal не запускались | Issue #76 / draft PR |
 | 2026-07-19 | 05 | Завершено | PR #75 слит: 05-K зафиксировала documentation-only ownership backfill plan с ручным model-to-workspace manifest, parent-only наследованием, quarantine, counts/invariants/rollback и ручными gates; backfill и production-действия не выполнялись | PR #75 / `c5b450b` |
@@ -123,7 +125,6 @@
 | 2026-07-17 | 00 | Завершено | PR #55 слит: подтверждённый `main` — `b4c665a`, активная защита `main` зафиксирована; следующий текущий review — draft PR #57 для Issue #56 | PR #55 / `b4c665a` |
 | 2026-07-17 | 00 | Завершено | PR #53 слит: Project state workflow запускается на каждом PR; GitHub ruleset `Protect main` настроен вручную без изменений из этого PR | PR #53 / `5a0988b` |
 | 2026-07-17 | 05 | Завершено | PR #49 слит: additive tenant foundation `0900` вошла в `main`; без backfill, runtime/UI, production cutover и production-доступа | PR #49 / `792c35d` |
-| 2026-07-17 | 00 | Завершено | Подтверждён `main` `0022900`: PR #47 слит после PR #44–#46; открыт draft PR #49, его изменения не считаются состоянием `main` | PR #47 / `0022900` |
 
 ## Шаблон передачи состояния после работы
 

@@ -28,6 +28,39 @@ type Item = {
   review_comment?: string | null;
   disclosure?: string | null;
   tracking_destination_url?: string | null;
+  trend_note?: string | null;
+};
+type SocialAccount = {
+  id: string;
+  model_id: string;
+  platform: string;
+  handle: string;
+  upload_notes: string | null;
+  created_by: string;
+};
+const PLATFORM_LABELS: Record<string, string> = {
+  instagram: "Instagram",
+  tiktok: "TikTok",
+  telegram: "Telegram",
+  youtube_shorts: "YouTube Shorts",
+  reddit: "Reddit",
+  x: "X",
+  fanvue: "Fanvue",
+};
+const UPLOAD_GUIDES: Record<string, string> = {
+  Instagram:
+    "Открой Instagram → «Создать» → загрузи материал из библиотеки Atlas → вставь готовый текст → если есть трекинг-ссылка, добавь её в шапку профиля.",
+  TikTok:
+    "Открой TikTok → «+» → загрузи видео или фото → вставь подпись. Ссылка кликабельна только в био — обнови его, если ссылка изменилась.",
+  Telegram:
+    "Опубликуй в канал модели → текст поста можно вставить как есть, ссылку — прямо в текст.",
+  "YouTube Shorts":
+    "Загрузи через YouTube Studio → Shorts → название и описание возьми из заголовка и подписи.",
+  Reddit:
+    "Публикуй только в подходящий сабреддит и по его правилам → если правила запрещают ссылки в посте, укажи её в профиле.",
+  X: "Опубликуй пост → лимит 280 символов, при необходимости сократи подпись из Atlas.",
+  Fanvue:
+    "Это площадка назначения, а не тизер — сюда ведут ссылки из остальных постов, публикуется отдельно в самом Fanvue.",
 };
 type AvatarJob = { id:string; model_id:string; kind:"avatar"|"scene"; prompt:string; style:string; status:string; output_urls:string[] | null; error:string | null; created_at:string };
 type Asset = {id:string;model_id:string;storage_path:string;kind:string;generation_job_id:string|null;created_at:string};
@@ -52,11 +85,13 @@ export default function Dashboard({ user }: { user: User }) {
     [contentOpen, setContentOpen] = useState(false),
     [avatarOpen, setAvatarOpen] = useState(false),
     [weekOpen, setWeekOpen] = useState(false),
+    [weekPresetModel, setWeekPresetModel] = useState(""),
+    [socialAccounts, setSocialAccounts] = useState<SocialAccount[]>([]),
     [linkClicks, setLinkClicks] = useState<Record<string, number>>({});
   const [selectedItem, setSelectedItem] = useState<Item | null>(null);
   async function load() {
     setLoading(true);
-    const [m, c, t, a, lc] = await Promise.all([
+    const [m, c, t, a, lc, sa] = await Promise.all([
       s.from("ai_models").select("*").order("created_at"),
       s
         .from("content_items")
@@ -65,17 +100,46 @@ export default function Dashboard({ user }: { user: User }) {
       s.from("profiles").select("email,role").order("created_at"),
       s.from("model_references").select("*").order("created_at",{ascending:false}),
       s.from("link_clicks").select("content_item_id"),
+      s.from("social_accounts").select("*").order("created_at"),
     ]);
-    setModels(m.data || []);
+    const contentCountByModel: Record<string, number> = {};
+    for (const it of c.data || []) {
+      if (it.model_id)
+        contentCountByModel[it.model_id] = (contentCountByModel[it.model_id] || 0) + 1;
+    }
+    function workStage(model: Model): number {
+      const hasContent = (contentCountByModel[model.id] || 0) > 0;
+      const hasAvatar = !!model.visual_passport?.avatar;
+      if (hasContent || model.status === "active") return 0;
+      if (hasAvatar) return 1;
+      return 2;
+    }
+    setModels(
+      [...(m.data || [])].sort((a, b) => {
+        const stageDiff = workStage(a) - workStage(b);
+        if (stageDiff !== 0) return stageDiff;
+        return String(b.created_at).localeCompare(String(a.created_at));
+      }),
+    );
     setItems(c.data || []);
     setTeam(t.data || []);
     setAssets(a.data||[]);
+    setSocialAccounts(sa.data || []);
     const clickCounts: Record<string, number> = {};
     for (const row of lc.data || []) {
       clickCounts[row.content_item_id] = (clickCounts[row.content_item_id] || 0) + 1;
     }
     setLinkClicks(clickCounts);
     setLoading(false);
+  }
+  async function saveSocialAccount(a: Partial<SocialAccount>) {
+    if (a.id) await s.from("social_accounts").update({ handle: a.handle, upload_notes: a.upload_notes }).eq("id", a.id);
+    else await s.from("social_accounts").insert({ model_id: a.model_id, platform: a.platform, handle: a.handle, upload_notes: a.upload_notes || null, created_by: user.id });
+    load();
+  }
+  async function deleteSocialAccount(id: string) {
+    await s.from("social_accounts").delete().eq("id", id);
+    load();
   }
   useEffect(() => {
     load();
@@ -206,8 +270,16 @@ export default function Dashboard({ user }: { user: User }) {
       {modelOpen !== undefined && (
         <ModelDialog
           model={modelOpen}
+          accounts={socialAccounts}
+          saveAccount={saveSocialAccount}
+          deleteAccount={deleteSocialAccount}
           close={() => setModelOpen(undefined)}
           save={saveModel}
+          generateWeek={(id) => {
+            setModelOpen(undefined);
+            setWeekPresetModel(id);
+            setWeekOpen(true);
+          }}
         />
       )}{" "}
       {contentOpen && (
@@ -231,8 +303,13 @@ export default function Dashboard({ user }: { user: User }) {
       {weekOpen && (
         <WeekPlanner
           models={models}
+          accounts={socialAccounts}
+          presetModelId={weekPresetModel}
           history={items.slice(0, 20)}
-          close={() => setWeekOpen(false)}
+          close={() => {
+            setWeekOpen(false);
+            setWeekPresetModel("");
+          }}
           save={saveWeek}
         />
       )}
@@ -639,16 +716,26 @@ function FanReply({ models }: { models: Model[] }) {
 }
 function ModelDialog({
   model,
+  accounts,
+  saveAccount,
+  deleteAccount,
   close,
   save,
+  generateWeek,
 }: {
   model: Model | null;
+  accounts: SocialAccount[];
+  saveAccount: (a: Partial<SocialAccount>) => void;
+  deleteAccount: (id: string) => void;
   close: () => void;
   save: (m: Partial<Model>) => void;
+  generateWeek: (modelId: string) => void;
 }) {
   const [tab, setTab] = useState("Личность"),
     [appearanceLoading, setAppearanceLoading] = useState(false),
     [appearanceError, setAppearanceError] = useState(""),
+    [newPlatform, setNewPlatform] = useState("instagram"),
+    [newHandle, setNewHandle] = useState(""),
     [m, setM] = useState<Partial<Model>>(() =>
       model || {
         name: "",
@@ -707,7 +794,10 @@ function ModelDialog({
       <small>ATLAS CHARACTER BRAIN</small>
       <h2>{model ? "Редактировать модель" : "Новая AI-модель"}</h2>
       <div className="brain-tabs">
-        {["Личность", "Внешность", "Память и сюжет"].map((x) => (
+        {(model
+          ? ["Личность", "Внешность", "Память и сюжет", "Аккаунты"]
+          : ["Личность", "Внешность", "Память и сюжет"]
+        ).map((x) => (
           <button
             key={x}
             className={tab === x ? "active" : ""}
@@ -1003,6 +1093,82 @@ function ModelDialog({
           </label>
         </div>
       )}
+      {tab === "Аккаунты" && model && (
+        <div className="form accounts-tab">
+          <div className="accounts-generate">
+            <b>Сгенерировать неделю с учётом трендов</b>
+            <p>
+              Atlas проверит, что сейчас заходит в нише, подготовит и
+              проверит промпт, затем сгенерирует посты под площадки ниже.
+              Публикация остаётся ручной — Atlas готовит пакет и инструкцию,
+              не постит сама.
+            </p>
+            <button onClick={() => generateWeek(model.id)}>
+              ✦ Сгенерировать неделю
+            </button>
+          </div>
+          <b>Подключённые площадки</b>
+          <div className="accounts-list">
+            {accounts.filter((a) => a.model_id === model.id).length ? (
+              accounts
+                .filter((a) => a.model_id === model.id)
+                .map((a) => (
+                  <div key={a.id} className="account-row">
+                    <span className="account-platform">
+                      {PLATFORM_LABELS[a.platform] || a.platform}
+                    </span>
+                    <input
+                      value={a.handle}
+                      onChange={(e) =>
+                        saveAccount({ ...a, handle: e.target.value })
+                      }
+                    />
+                    <input
+                      value={a.upload_notes || ""}
+                      placeholder="Заметка про загрузку — необязательно"
+                      onChange={(e) =>
+                        saveAccount({ ...a, upload_notes: e.target.value })
+                      }
+                    />
+                    <button onClick={() => deleteAccount(a.id)}>×</button>
+                  </div>
+                ))
+            ) : (
+              <small>Площадки ещё не добавлены.</small>
+            )}
+          </div>
+          <div className="account-add">
+            <select
+              value={newPlatform}
+              onChange={(e) => setNewPlatform(e.target.value)}
+            >
+              {Object.entries(PLATFORM_LABELS).map(([k, v]) => (
+                <option key={k} value={k}>
+                  {v}
+                </option>
+              ))}
+            </select>
+            <input
+              value={newHandle}
+              onChange={(e) => setNewHandle(e.target.value)}
+              placeholder="@handle или ссылка"
+            />
+            <button
+              onClick={() => {
+                if (!newHandle.trim()) return;
+                saveAccount({
+                  model_id: model.id,
+                  platform: newPlatform,
+                  handle: newHandle.trim(),
+                });
+                setNewHandle("");
+              }}
+            >
+              Добавить
+            </button>
+          </div>
+        </div>
+      )}
       <div className="brain-footer">
         <span>
           Эти данные автоматически используются всеми генераторами Atlas.
@@ -1210,50 +1376,118 @@ function ContentDialog({
 }
 function WeekPlanner({
   models,
+  accounts,
+  presetModelId,
   history,
   close,
   save,
 }: {
   models: Model[];
+  accounts: SocialAccount[];
+  presetModelId?: string;
   history: Item[];
   close: () => void;
   save: (x: Partial<Item>[]) => void;
 }) {
-  const [modelId, setModelId] = useState(models[0]?.id || ""),
+  const [modelId, setModelId] = useState(presetModelId || models[0]?.id || ""),
     [theme, setTheme] = useState(""),
     [goal, setGoal] = useState("Рост аудитории и укрепление образа модели"),
     [start, setStart] = useState(new Date().toISOString().slice(0, 10)),
-    [loading, setLoading] = useState(false),
+    [stage, setStage] = useState<"idle" | "trend" | "validate" | "generate">("idle"),
     [error, setError] = useState(""),
+    [trendError, setTrendError] = useState(""),
+    [trend, setTrend] = useState<{ summary: string; angles: string[] } | null>(null),
+    [warnings, setWarnings] = useState<string[]>([]),
     [plan, setPlan] = useState<{
       week_theme: string;
       strategy: string;
       posts: Array<Record<string, unknown>>;
     } | null>(null);
-  async function create() {
-    const model = models.find((m) => m.id === modelId);
-    if (!model || !theme) return;
-    setLoading(true);
+  const model = models.find((mm) => mm.id === modelId);
+  const platformLabels = useMemo(() => {
+    const connected = accounts
+      .filter((a) => a.model_id === modelId && a.platform !== "fanvue")
+      .map((a) => PLATFORM_LABELS[a.platform] || a.platform);
+    const unique = Array.from(new Set(connected));
+    return unique.length ? unique : ["Instagram", "TikTok", "Telegram"];
+  }, [accounts, modelId]);
+  const loading = stage !== "idle";
+  async function runPipeline() {
+    if (!model) return;
     setError("");
+    setTrendError("");
+    setWarnings([]);
+    setTrend(null);
+    setStage("trend");
+    let angles: string[] = [];
+    try {
+      const r = await fetch("/api/trends", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            niche: model.niche,
+            bio: model.bio,
+            platforms: platformLabels,
+          }),
+        }),
+        data = await r.json();
+      if (r.ok) {
+        setTrend(data);
+        angles = data.angles || [];
+      } else {
+        setTrendError(data.error || "Не удалось проверить тренды, продолжаем без них.");
+      }
+    } catch {
+      setTrendError("Не удалось проверить тренды, продолжаем без них.");
+    }
+    setStage("validate");
+    const forbidden = (model.visual_passport?.forbidden_topics || "")
+      .split(/[,;]/)
+      .map((w) => w.trim().toLowerCase())
+      .filter(Boolean);
+    const hitsForbidden = (text: string) =>
+      forbidden.find((w) => w && text.toLowerCase().includes(w));
+    const safeAngles = angles.filter((a) => !hitsForbidden(a));
+    const finalTheme =
+      theme.trim() ||
+      safeAngles.slice(0, 2).join(" · ") ||
+      model.niche ||
+      "Актуальная неделя контента";
+    setStage("generate");
     try {
       const r = await fetch("/api/plan-week", {
           method: "POST",
           headers: { "content-type": "application/json" },
           body: JSON.stringify({
             model,
-            theme,
+            theme: finalTheme,
             goal,
-            platforms: ["Instagram", "TikTok", "Telegram"],
+            platforms: platformLabels,
             history: history.map((x) => x.title),
           }),
         }),
         data = await r.json();
       if (!r.ok) throw new Error(data.error);
+      const foundWarnings: string[] = [];
+      for (const p of data.posts as Array<Record<string, unknown>>) {
+        const text = `${String(p.caption || "")} ${String(p.visual_prompt || "")}`;
+        const hit = hitsForbidden(text);
+        if (hit)
+          foundWarnings.push(
+            `«${String(p.title)}» (${String(p.platform)}): похоже, задевает запрещённую тему «${hit}» — проверь вручную.`,
+          );
+        if (!String(p.disclosure || "").trim())
+          foundWarnings.push(
+            `«${String(p.title)}» (${String(p.platform)}): нет AI-дисклоуза — добавь перед публикацией.`,
+          );
+      }
+      setWarnings(foundWarnings);
       setPlan(data);
+      if (!theme.trim() && safeAngles.length) setTheme(finalTheme);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Ошибка планирования");
     } finally {
-      setLoading(false);
+      setStage("idle");
     }
   }
   function commit() {
@@ -1270,12 +1504,13 @@ function WeekPlanner({
           title: String(p.title),
           platform: String(p.platform),
           format: String(p.format),
-          status: "draft",
+          status: "review",
           caption: `${p.hook}\n\n${p.caption}\n\n${p.cta}\n\n${(p.hashtags as string[]).join(" ")}`,
           visual_prompt: String(p.visual_prompt),
           shot_list: p.shot_list as string[],
           publish_at: d.toISOString(),
           disclosure: String(p.disclosure ?? ""),
+          trend_note: trend?.summary || null,
         };
       }),
     );
@@ -1297,12 +1532,20 @@ function WeekPlanner({
               ))}
             </select>
           </label>
+          <div className="week-platforms">
+            <small>ПЛОЩАДКИ ИЗ ПОДКЛЮЧЁННЫХ АККАУНТОВ</small>
+            <div>
+              {platformLabels.map((p) => (
+                <span key={p} className="platform-chip">{p}</span>
+              ))}
+            </div>
+          </div>
           <label>
-            Главная тема недели
+            Главная тема недели — необязательно
             <input
               value={theme}
               onChange={(e) => setTheme(e.target.value)}
-              placeholder="Например: мягкий переход к осеннему уходу"
+              placeholder="Оставь пустым — Atlas предложит тему по трендам"
             />
           </label>
           <label>
@@ -1323,12 +1566,20 @@ function WeekPlanner({
             />
           </label>
           <div className="week-info">
-            Один AI-запрос создаст 7 связанных публикаций, не повторяя последние
-            материалы.
+            Atlas проверит тренды, подготовит и проверит тему, затем создаст 7
+            связанных публикаций под площадки выше — без повтора последних
+            материалов.
           </div>
-          <button onClick={create} disabled={loading || !theme}>
-            {loading ? "Atlas планирует неделю…" : "✦ Создать недельный план"}
+          <button onClick={runPipeline} disabled={loading || !modelId}>
+            {stage === "trend"
+              ? "1/3 · Проверяем, что сейчас популярно…"
+              : stage === "validate"
+                ? "2/3 · Проверяем тему…"
+                : stage === "generate"
+                  ? "3/3 · Генерируем неделю…"
+                  : "✦ Сгенерировать неделю"}
           </button>
+          {trendError && <small className="trend-warning">{trendError}</small>}
           {error && <strong className="generation-error">{error}</strong>}
         </div>
       ) : (
@@ -1337,7 +1588,23 @@ function WeekPlanner({
             <small>ТЕМА НЕДЕЛИ</small>
             <h3>{plan.week_theme}</h3>
             <p>{plan.strategy}</p>
+            {trend && (
+              <div className="trend-badge">
+                <b>Учтён тренд</b>
+                <span>{trend.summary}</span>
+              </div>
+            )}
           </div>
+          {warnings.length > 0 && (
+            <div className="week-warnings">
+              <b>Проверь перед добавлением в календарь:</b>
+              <ul>
+                {warnings.map((w, i) => (
+                  <li key={i}>{w}</li>
+                ))}
+              </ul>
+            </div>
+          )}
           <div className="week-posts">
             {plan.posts.map((p, i) => (
               <article key={`${String(p.day_offset)}-${String(p.publish_time)}-${String(p.platform)}-${String(p.format)}-${String(p.title)}-${String(p.goal)}`}>
@@ -1356,12 +1623,54 @@ function WeekPlanner({
           <div className="week-actions">
             <button onClick={() => setPlan(null)}>Изменить задачу</button>
             <button onClick={commit}>
-              ✓ Добавить 7 публикаций в календарь
+              ✓ Добавить 7 публикаций на проверку
             </button>
           </div>
         </div>
       )}
     </Modal>
+  );
+}
+const PLATFORM_LIMITS: Record<string, number> = {
+  Instagram: 2200,
+  TikTok: 2200,
+  Telegram: 4096,
+  "YouTube Shorts": 5000,
+  Reddit: 300,
+  X: 280,
+};
+function PostTextEditor({
+  value,
+  onChange,
+  placeholder,
+  platform,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  placeholder?: string;
+  platform?: string | null;
+}) {
+  const limit = platform ? PLATFORM_LIMITS[platform] : undefined;
+  const len = value.length;
+  const over = limit ? len > limit : false;
+  const hashtags = value.match(/#[\p{L}\d_]+/gu) || [];
+  return (
+    <div className="post-editor">
+      <textarea
+        className="post-editor-textarea"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        rows={Math.min(14, Math.max(3, value.split("\n").length + 1))}
+      />
+      <div className="post-editor-meta">
+        <span>{hashtags.length > 0 ? `${hashtags.length} хэштегов` : ""}</span>
+        <span className={over ? "post-editor-count over" : "post-editor-count"}>
+          {len}
+          {limit ? ` / ${limit}` : ""}
+        </span>
+      </div>
+    </div>
   );
 }
 function PublicationDialog({
@@ -1472,6 +1781,11 @@ function PublicationDialog({
           <small className="disclosure-preview">
             {draft.disclosure || "⚠ Дисклоуз не задан"}
           </small>
+          {draft.trend_note && (
+            <small className="trend-note-preview">
+              Учтён тренд на момент генерации: {draft.trend_note}
+            </small>
+          )}
         </div>
       )}
       {tab === "Материалы" && (
@@ -1508,20 +1822,25 @@ function PublicationDialog({
           </label>
           <label>
             Текст публикации
-            <textarea
+            <PostTextEditor
               value={draft.caption || ""}
-              onChange={(e) => setDraft({ ...draft, caption: e.target.value })}
+              onChange={(v) => setDraft({ ...draft, caption: v })}
+              platform={draft.platform}
             />
           </label>
           <label>
             Визуальный промпт
-            <textarea
+            <PostTextEditor
               value={draft.visual_prompt || ""}
-              onChange={(e) =>
-                setDraft({ ...draft, visual_prompt: e.target.value })
-              }
+              onChange={(v) => setDraft({ ...draft, visual_prompt: v })}
             />
           </label>
+          {draft.platform && UPLOAD_GUIDES[draft.platform] && (
+            <div className="upload-guide">
+              <b>Куда и как загрузить · {draft.platform}</b>
+              <p>{UPLOAD_GUIDES[draft.platform]}</p>
+            </div>
+          )}
           <label>
             Дата публикации
             <input
@@ -1559,11 +1878,9 @@ function PublicationDialog({
           </label>
           <label>
             Комментарий редактора
-            <textarea
+            <PostTextEditor
               value={draft.review_comment || ""}
-              onChange={(e) =>
-                setDraft({ ...draft, review_comment: e.target.value })
-              }
+              onChange={(v) => setDraft({ ...draft, review_comment: v })}
               placeholder="Что изменить или проверить?"
             />
           </label>

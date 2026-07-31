@@ -10,7 +10,7 @@ const item = {
     title: { type: "string" },
     platform: {
       type: "string",
-      enum: ["Instagram", "TikTok", "YouTube Shorts", "Telegram"],
+      enum: ["Instagram", "TikTok", "YouTube Shorts", "Telegram", "Reddit", "X"],
     },
     format: { type: "string", enum: ["Reels", "Карусель", "Пост", "Stories"] },
     goal: { type: "string" },
