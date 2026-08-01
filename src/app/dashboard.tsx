@@ -87,7 +87,9 @@ export default function Dashboard({ user }: { user: User }) {
     [weekOpen, setWeekOpen] = useState(false),
     [weekPresetModel, setWeekPresetModel] = useState(""),
     [socialAccounts, setSocialAccounts] = useState<SocialAccount[]>([]),
-    [linkClicks, setLinkClicks] = useState<Record<string, number>>({});
+    [linkClicks, setLinkClicks] = useState<Record<string, number>>({}),
+    [viewModelId, setViewModelId] = useState<string | null>(null),
+    [avatarPresetModel, setAvatarPresetModel] = useState("");
   const [selectedItem, setSelectedItem] = useState<Item | null>(null);
   async function load() {
     setLoading(true);
@@ -236,37 +238,69 @@ export default function Dashboard({ user }: { user: User }) {
           </div>
         </header>
         <div className="content">
-          {page === "Главная" && (
-            <Home
-              models={models}
-              items={items}
-              create={() => setContentOpen(true)}
-              nav={setPage}
-              openItem={setSelectedItem}
-            />
-          )}{" "}
-          {page === "AI-модели" && (
-            <Models
-              models={models}
-              add={() => setModelOpen(null)}
-              edit={setModelOpen}
-              avatars={() => setAvatarOpen(true)}
-            />
-          )}{" "}
-          {page === "Контент-студия" && (
-            <Studio
-              items={items}
-              models={models}
-              add={() => setContentOpen(true)}
-              status={status}
-              open={setSelectedItem}
-              plan={() => setWeekOpen(true)}
-            />
-          )}{" "}
-          {page === "Календарь" && <Calendar items={items} open={setSelectedItem} />}{" "}
-          {page === "Команда" && <Team team={team} />}{" "}
-          {page === "Настройки" && <Settings user={user} />}{" "}
-          {page === "Фан-чат" && <FanReply models={models} />}
+          {(() => {
+            const viewModel = viewModelId ? models.find((mo) => mo.id === viewModelId) : undefined;
+            if (viewModel) {
+              return (
+                <CharacterPage
+                  key={viewModel.id}
+                  model={viewModel}
+                  items={items}
+                  accounts={socialAccounts}
+                  clicks={linkClicks}
+                  close={() => setViewModelId(null)}
+                  saveAccount={saveSocialAccount}
+                  deleteAccount={deleteSocialAccount}
+                  saveModel={saveModel}
+                  updateItem={updateItem}
+                  openAvatar={() => {
+                    setAvatarPresetModel(viewModel.id);
+                    setAvatarOpen(true);
+                  }}
+                  generateWeek={(id) => {
+                    setWeekPresetModel(id);
+                    setWeekOpen(true);
+                  }}
+                />
+              );
+            }
+            return (
+              <>
+                {page === "Главная" && (
+                  <Home
+                    models={models}
+                    items={items}
+                    create={() => setContentOpen(true)}
+                    nav={setPage}
+                    openItem={setSelectedItem}
+                    openModel={(id) => setViewModelId(id)}
+                  />
+                )}{" "}
+                {page === "AI-модели" && (
+                  <Models
+                    models={models}
+                    add={() => setModelOpen(null)}
+                    edit={(mo) => setViewModelId(mo.id)}
+                    avatars={() => setAvatarOpen(true)}
+                  />
+                )}{" "}
+                {page === "Контент-студия" && (
+                  <Studio
+                    items={items}
+                    models={models}
+                    add={() => setContentOpen(true)}
+                    status={status}
+                    open={setSelectedItem}
+                    plan={() => setWeekOpen(true)}
+                  />
+                )}{" "}
+                {page === "Календарь" && <Calendar items={items} open={setSelectedItem} />}{" "}
+                {page === "Команда" && <Team team={team} />}{" "}
+                {page === "Настройки" && <Settings user={user} />}{" "}
+                {page === "Фан-чат" && <FanReply models={models} />}
+              </>
+            );
+          })()}
         </div>
       </main>
       {modelOpen !== undefined && (
@@ -291,7 +325,7 @@ export default function Dashboard({ user }: { user: User }) {
           save={saveItem}
         />
       )}
-      {avatarOpen && <AvatarStudio models={models} items={items} assets={assets} close={()=>setAvatarOpen(false)} savePortrait={async(model,url)=>{const passport={...(model.visual_passport||{}),avatar:url};await s.from("ai_models").update({visual_passport:passport}).eq("id",model.id);await s.from("model_references").update({kind:"reference"}).eq("model_id",model.id).eq("kind","primary");await s.from("model_references").insert({model_id:model.id,storage_path:url,kind:"primary",created_by:user.id});await load();}} saveAsset={async(model,url,jobId)=>{if(!assets.some(a=>a.storage_path===url))await s.from("model_references").insert({model_id:model.id,storage_path:url,kind:"reference",generation_job_id:jobId,created_by:user.id});await load();}} attach={async(itemId,url)=>{await s.from("content_items").update({asset_url:url}).eq("id",itemId);await load();}} />}
+      {avatarOpen && <AvatarStudio models={models} items={items} assets={assets} initialModelId={avatarPresetModel} close={()=>{setAvatarOpen(false);setAvatarPresetModel("")}} savePortrait={async(model,url)=>{const passport={...(model.visual_passport||{}),avatar:url};await s.from("ai_models").update({visual_passport:passport}).eq("id",model.id);await s.from("model_references").update({kind:"reference"}).eq("model_id",model.id).eq("kind","primary");await s.from("model_references").insert({model_id:model.id,storage_path:url,kind:"primary",created_by:user.id});await load();}} saveAsset={async(model,url,jobId)=>{if(!assets.some(a=>a.storage_path===url))await s.from("model_references").insert({model_id:model.id,storage_path:url,kind:"reference",generation_job_id:jobId,created_by:user.id});await load();}} attach={async(itemId,url)=>{await s.from("content_items").update({asset_url:url}).eq("id",itemId);await load();}} />}
       {selectedItem && (
         <PublicationDialog
           item={selectedItem}
@@ -324,12 +358,14 @@ function Home({
   create,
   nav,
   openItem,
+  openModel,
 }: {
   models: Model[];
   items: Item[];
   create: () => void;
   nav: (page: string) => void;
   openItem: (item: Item) => void;
+  openModel: (id: string) => void;
 }) {
   const [renderedAt] = useState(() => Date.now());
   const ready = items.filter((x) => x.status === "ready" || x.status === "published").length;
@@ -366,7 +402,7 @@ function Home({
         ))}
       </div>
       <div className="section-heading"><div><small>ТВОИ ЦИФРОВЫЕ АВТОРЫ</small><h2>AI-модели</h2></div><span className="link-action" onClick={() => nav("AI-модели")}>Показать все ›</span></div>
-      <ModelCards models={models} />
+      <ModelCards models={models} edit={(mo) => openModel(mo.id)} />
       <div className="section-heading queue-heading"><div><small>ЛИНИЯ ПРОИЗВОДСТВА</small><h2>Очередь на сегодня</h2></div><span className="link-action" onClick={() => nav("Календарь")}>Открыть календарь ›</span></div>
       {scheduled ? <section className="today-queue">
         <div><small>◷ СЛЕДУЮЩАЯ ПУБЛИКАЦИЯ · {new Date(scheduled.publish_at!).toLocaleTimeString("ru-RU",{hour:"2-digit",minute:"2-digit"})}</small><h3>{scheduled.title}</h3><p>{scheduledModel?.name || "Без модели"} · {scheduled.format || scheduled.platform}</p><button onClick={() => openItem(scheduled)}>▶ Предпросмотр</button></div>
@@ -398,8 +434,8 @@ function Models({
     </>
   );
 }
-function AvatarStudio({models,items,assets,close,savePortrait,saveAsset,attach}:{models:Model[];items:Item[];assets:Asset[];close:()=>void;savePortrait:(model:Model,url:string)=>Promise<void>;saveAsset:(model:Model,url:string,jobId:string)=>Promise<void>;attach:(itemId:string,url:string)=>Promise<void>}){
-  const [modelId,setModelId]=useState(models[0]?.id||""),[kind,setKind]=useState<"avatar"|"scene">("avatar"),[prompt,setPrompt]=useState(""),[style,setStyle]=useState("Фотореалистичный lifestyle"),[framing,setFraming]=useState("waist_up"),[jobs,setJobs]=useState<AvatarJob[]>([]),[targetId,setTargetId]=useState(""),[refineSource,setRefineSource]=useState(""),[previewUrl,setPreviewUrl]=useState(""),[busy,setBusy]=useState(false),[retrying,setRetrying]=useState(""),[error,setError]=useState("");
+function AvatarStudio({models,items,assets,close,savePortrait,saveAsset,attach,initialModelId}:{models:Model[];items:Item[];assets:Asset[];close:()=>void;savePortrait:(model:Model,url:string)=>Promise<void>;saveAsset:(model:Model,url:string,jobId:string)=>Promise<void>;attach:(itemId:string,url:string)=>Promise<void>;initialModelId?:string}){
+  const [modelId,setModelId]=useState(initialModelId||models[0]?.id||""),[kind,setKind]=useState<"avatar"|"scene">("avatar"),[prompt,setPrompt]=useState(""),[style,setStyle]=useState("Фотореалистичный lifestyle"),[framing,setFraming]=useState("waist_up"),[jobs,setJobs]=useState<AvatarJob[]>([]),[targetId,setTargetId]=useState(""),[refineSource,setRefineSource]=useState(""),[previewUrl,setPreviewUrl]=useState(""),[busy,setBusy]=useState(false),[retrying,setRetrying]=useState(""),[error,setError]=useState("");
   const model=models.find(m=>m.id===modelId);
   async function refresh(){const r=await fetch("/api/avatar");if(r.ok){const d=await r.json();setJobs(d.jobs||[])}}
   useEffect(()=>{refresh();const timer=setInterval(refresh,5000);return()=>clearInterval(timer)},[]);
@@ -412,6 +448,339 @@ function AvatarStudio({models,items,assets,close,savePortrait,saveAsset,attach}:
     <div className="avatar-results">{kind==="scene"&&<div className="attach-bar"><label>Прикрепить выбранную сцену к публикации<select value={targetId} onChange={e=>setTargetId(e.target.value)}><option value="">Только сохранить в библиотеку</option>{items.filter(i=>i.model_id===modelId).map(i=><option key={i.id} value={i.id}>{i.title}</option>)}</select></label><span>{assets.filter(a=>a.model_id===modelId&&a.kind==="reference").length} материалов в библиотеке</span></div>}{!ownJobs.length?<div className="avatar-placeholder"><i>✦</i><b>Здесь появятся варианты</b><span>Результаты обновятся автоматически.</span></div>:ownJobs.slice(0,4).map(job=><section key={job.id}><header><span>{job.kind==="scene"?"Сцена · ":"Лицо · "}{job.status==="completed"?"Готово":job.status==="failed"?"Облако не запустилось":job.status==="processing"?"Создаём…":"Ожидает GPU"}</span><div className="job-actions">{job.status==="failed"&&<button className="refine-button" onClick={()=>retry(job)} disabled={retrying===job.id}>{retrying===job.id?"Повторяем…":"Повторить"}</button>}{job.kind==="scene"&&job.output_urls?.[0]&&<button className="refine-button" onClick={()=>{setKind("scene");setRefineSource(job.output_urls?.[0]||"");setPrompt("")}}>Улучшить</button>}<time>{new Date(job.created_at).toLocaleString("ru-RU")}</time><button className="job-delete" onClick={()=>remove(job.id)}>×</button></div></header>{job.output_urls?.length?<div className={`avatar-grid ${job.output_urls.length===1?"single":""}`}>{job.output_urls.map(url=><div className="avatar-tile" key={url}><button className="avatar-preview-button" onClick={()=>setPreviewUrl(url)} aria-label="Открыть изображение на весь экран"><img src={url} alt={`Результат генерации для ${model?.name || "AI-модели"}`}/><span className="preview-label">Увеличить</span></button><button className="avatar-save-button" onClick={async()=>{if(!model)return;if(job.kind==="avatar")await savePortrait(model,url);else{await saveAsset(model,url,job.id);if(targetId){await attach(targetId,url);}}}}>{job.kind==="avatar"?"Сделать эталоном":targetId?"Сохранить и прикрепить":"В библиотеку"}</button>{assets.some(a=>a.storage_path===url)&&<b className="saved-badge">✓</b>}</div>)}</div>:<div className="job-progress"><i/><p>{job.error||(job.status==="queued"?"Modal подбирает свободный GPU. Если он не запустится, Atlas завершит ожидание автоматически.":"Задание принято. Результаты обновятся автоматически.")}</p></div>}</section>)}</div></div>
     {previewUrl&&<div className="image-lightbox" onClick={()=>setPreviewUrl("")} role="dialog" aria-modal="true"><button className="lightbox-close" onClick={()=>setPreviewUrl("")} aria-label="Закрыть">×</button><img src={previewUrl} onClick={e=>e.stopPropagation()} alt="Результат генерации"/></div>}
   </Modal>
+}
+function CharacterPage({
+  model,
+  items,
+  accounts,
+  clicks,
+  close,
+  saveAccount,
+  deleteAccount,
+  saveModel,
+  updateItem,
+  openAvatar,
+  generateWeek,
+}: {
+  model: Model;
+  items: Item[];
+  accounts: SocialAccount[];
+  clicks: Record<string, number>;
+  close: () => void;
+  saveAccount: (a: Partial<SocialAccount>) => void;
+  deleteAccount: (id: string) => void;
+  saveModel: (m: Partial<Model>) => void;
+  updateItem: (x: Partial<Item>) => void;
+  openAvatar: () => void;
+  generateWeek: (modelId: string) => void;
+}) {
+  const [m, setM] = useState<Partial<Model>>(model);
+  const [now] = useState(() => Date.now());
+  const [newPlatform, setNewPlatform] = useState("instagram"),
+    [newHandle, setNewHandle] = useState("");
+  const ownItems = [...items]
+    .filter((i) => i.model_id === model.id)
+    .sort((a, b) => {
+      const af = a.publish_at ? new Date(a.publish_at).getTime() : Infinity;
+      const bf = b.publish_at ? new Date(b.publish_at).getTime() : Infinity;
+      const aUp = af >= now,
+        bUp = bf >= now;
+      if (aUp !== bUp) return aUp ? -1 : 1;
+      if (aUp && bUp) return af - bf;
+      return 0;
+    });
+  const [selectedId, setSelectedId] = useState(ownItems[0]?.id || "");
+  const selected =
+    ownItems.find((i) => i.id === selectedId) || ownItems[0] || null;
+  const ownAccounts = accounts.filter((a) => a.model_id === model.id);
+  const statusLabel: Record<string, string> = {
+    draft: "Черновик",
+    review: "На проверке",
+    ready: "Согласовано",
+    published: "Опубликовано",
+  };
+  return (
+    <div className="character-page">
+      <button className="character-back" onClick={close}>
+        ‹ Все AI-модели
+      </button>
+      <div className="character-head">
+        <button
+          className="character-avatar"
+          onClick={openAvatar}
+          aria-label="Изменить внешность"
+        >
+          {model.visual_passport?.avatar ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={model.visual_passport.avatar} alt={model.name} />
+          ) : (
+            <span>{model.name.slice(0, 1)}</span>
+          )}
+          <span className="character-avatar-hint">✦ Изменить внешность</span>
+        </button>
+        <div className="character-info">
+          <small>{model.status === "active" ? "Активна" : "Черновик"}</small>
+          <h2>{model.name}</h2>
+          <p>
+            {model.handle || "Профиль не указан"} ·{" "}
+            {model.niche || "Ниша не указана"}
+          </p>
+          <button className="week-button" onClick={() => generateWeek(model.id)}>
+            ✦ Сгенерировать неделю
+          </button>
+        </div>
+      </div>
+      <details className="character-section" open>
+        <summary>Личность</summary>
+        <div className="form">
+          {(["name", "handle", "niche", "bio"] as const).map((k) => (
+            <label key={k}>
+              {
+                (
+                  {
+                    name: "Имя",
+                    handle: "Профиль",
+                    niche: "Ниша",
+                    bio: "Описание",
+                  } as Record<string, string>
+                )[k]
+              }
+              <input
+                value={m[k] || ""}
+                onChange={(e) => setM({ ...m, [k]: e.target.value })}
+              />
+            </label>
+          ))}
+          <label>
+            Голос и манера общения
+            <textarea
+              value={m.visual_passport?.tone || ""}
+              onChange={(e) =>
+                setM({
+                  ...m,
+                  visual_passport: { ...m.visual_passport, tone: e.target.value },
+                })
+              }
+            />
+          </label>
+        </div>
+      </details>
+      <details className="character-section">
+        <summary>Память и сюжет</summary>
+        <div className="form brain-memory">
+          <label>
+            Биография персонажа
+            <textarea
+              value={m.visual_passport?.biography || ""}
+              onChange={(e) =>
+                setM({
+                  ...m,
+                  visual_passport: {
+                    ...m.visual_passport,
+                    biography: e.target.value,
+                  },
+                })
+              }
+            />
+          </label>
+          <label className="storyline">
+            Текущая сюжетная линия
+            <textarea
+              value={m.visual_passport?.storyline || ""}
+              onChange={(e) =>
+                setM({
+                  ...m,
+                  visual_passport: {
+                    ...m.visual_passport,
+                    storyline: e.target.value,
+                  },
+                })
+              }
+            />
+          </label>
+        </div>
+      </details>
+      <div className="character-save-bar">
+        <button onClick={() => saveModel(m)}>Сохранить профиль</button>
+      </div>
+      <div className="character-section character-accounts">
+        <b>Подключённые площадки</b>
+        <div className="accounts-list">
+          {ownAccounts.length ? (
+            ownAccounts.map((a) => (
+              <div key={a.id} className="account-row">
+                <span className="account-platform">
+                  {PLATFORM_LABELS[a.platform] || a.platform}
+                </span>
+                <input
+                  value={a.handle}
+                  onChange={(e) => saveAccount({ ...a, handle: e.target.value })}
+                />
+                <input
+                  value={a.upload_notes || ""}
+                  placeholder="Заметка про загрузку — необязательно"
+                  onChange={(e) =>
+                    saveAccount({ ...a, upload_notes: e.target.value })
+                  }
+                />
+                <button onClick={() => deleteAccount(a.id)}>×</button>
+              </div>
+            ))
+          ) : (
+            <small>Площадки ещё не добавлены.</small>
+          )}
+        </div>
+        <div className="account-add">
+          <select
+            value={newPlatform}
+            onChange={(e) => setNewPlatform(e.target.value)}
+          >
+            {Object.entries(PLATFORM_LABELS).map(([k, v]) => (
+              <option key={k} value={k}>
+                {v}
+              </option>
+            ))}
+          </select>
+          <input
+            value={newHandle}
+            onChange={(e) => setNewHandle(e.target.value)}
+            placeholder="@handle или ссылка"
+          />
+          <button
+            onClick={() => {
+              if (!newHandle.trim()) return;
+              saveAccount({
+                model_id: model.id,
+                platform: newPlatform,
+                handle: newHandle.trim(),
+              });
+              setNewHandle("");
+            }}
+          >
+            Добавить
+          </button>
+        </div>
+      </div>
+      <div className="character-section character-posts">
+        <b>Публикации</b>
+        {ownItems.length ? (
+          <>
+            <div className="post-strip">
+              {ownItems.map((i) => (
+                <button
+                  key={i.id}
+                  className={i.id === selected?.id ? "post-chip active" : "post-chip"}
+                  onClick={() => setSelectedId(i.id)}
+                >
+                  <small>{statusLabel[i.status] || i.status}</small>
+                  <span>{i.platform || i.format}</span>
+                  <em>{i.title}</em>
+                </button>
+              ))}
+            </div>
+            {selected && (
+              <PostPreviewPanel
+                key={selected.id}
+                item={selected}
+                model={model}
+                clicks={clicks[selected.id] || 0}
+                save={updateItem}
+              />
+            )}
+          </>
+        ) : (
+          <small>У этой модели пока нет публикаций.</small>
+        )}
+      </div>
+    </div>
+  );
+}
+function PostPreviewPanel({
+  item,
+  model,
+  clicks,
+  save,
+}: {
+  item: Item;
+  model: Model;
+  clicks: number;
+  save: (x: Partial<Item>) => void;
+}) {
+  const [draft, setDraft] = useState<Partial<Item>>(item);
+  const trackingLink =
+    typeof window !== "undefined" ? `${window.location.origin}/api/l/${item.id}` : "";
+  return (
+    <div className="character-preview">
+      <div className="social-preview">
+        <div className="social-bar">
+          <b>{model.handle || model.name}</b>
+          <span>•••</span>
+        </div>
+        <div className="visual-stage">
+          {draft.asset_url ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={draft.asset_url}
+              alt={
+                draft.title ? `Визуал публикации «${draft.title}»` : "Визуал публикации"
+              }
+            />
+          ) : (
+            <div>
+              <b>Визуал ещё не прикреплён</b>
+              <span>Вставь ссылку ниже</span>
+            </div>
+          )}
+        </div>
+        <label>
+          Ссылка на изображение
+          <input
+            value={draft.asset_url || ""}
+            onChange={(e) => setDraft({ ...draft, asset_url: e.target.value })}
+            placeholder="https://..."
+          />
+        </label>
+        <label>
+          Текст публикации
+          <PostTextEditor
+            value={draft.caption || ""}
+            onChange={(v) => setDraft({ ...draft, caption: v })}
+            platform={draft.platform}
+          />
+        </label>
+        <small className="disclosure-preview">
+          {draft.disclosure || "⚠ Дисклоуз не задан"}
+        </small>
+        {draft.platform && UPLOAD_GUIDES[draft.platform] && (
+          <div className="upload-guide">
+            <b>Куда и как загрузить · {draft.platform}</b>
+            <p>{UPLOAD_GUIDES[draft.platform]}</p>
+          </div>
+        )}
+        {draft.tracking_destination_url && (
+          <div className="tracking-link-box">
+            <span>Трек-ссылка:</span>
+            <code>{trackingLink}</code>
+            <small>{clicks} клик(ов)</small>
+          </div>
+        )}
+      </div>
+      <div className="character-preview-actions">
+        <select
+          value={draft.status || "draft"}
+          onChange={(e) => setDraft({ ...draft, status: e.target.value })}
+        >
+          <option value="draft">Черновик</option>
+          <option value="review">На проверке</option>
+          <option value="ready">Согласовано</option>
+          <option value="published">Опубликовано</option>
+        </select>
+        <button onClick={() => save({ ...draft, id: item.id })}>
+          Сохранить изменения
+        </button>
+      </div>
+    </div>
+  );
 }
 function ModelCards({models,edit}:{models:Model[];edit?:(m:Model)=>void}) {
   return <div className="models">{models.slice(0, edit ? undefined : 3).map((m,i)=><article key={m.id} onClick={()=>edit?.(m)}>
