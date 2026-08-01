@@ -2,7 +2,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 
-select plan(32);
+select plan(36);
 
 select has_table('public', 'profiles', 'profiles exists');
 select has_table('public', 'ai_models', 'ai_models exists');
@@ -25,9 +25,10 @@ select is(
     '202607201800',
     '202607202300',
     '202607211500',
-    '202607311300'
+    '202607311300',
+    '202608011400'
   ]::text[],
-  'the complete 0600 -> 0700 -> 0800 -> 0900 -> 1000 -> 1200 -> 1800 -> 2300 -> 1500 -> 311300 chain is recorded'
+  'the complete 0600 -> 0700 -> 0800 -> 0900 -> 1000 -> 1200 -> 1800 -> 2300 -> 1500 -> 311300 -> 011400 chain is recorded'
 );
 
 select set_eq(
@@ -267,14 +268,39 @@ select is(
         'workspace_members'
       )
       and column_name in (
-        'asset_url',
-        'review_comment',
         'workspace',
         'workspace_id'
       )
   ),
   0,
   'future non-owner bridge columns are absent'
+);
+
+select has_column('public', 'content_items', 'asset_url', 'content_items nullable asset_url bridge exists');
+select has_column('public', 'content_items', 'review_comment', 'content_items nullable review_comment bridge exists');
+
+select is(
+  (
+    select is_nullable
+    from information_schema.columns
+    where table_schema = 'public'
+      and table_name = 'content_items'
+      and column_name = 'asset_url'
+  ),
+  'YES',
+  'content_items.asset_url remains nullable, no default, no backfill'
+);
+
+select is(
+  (
+    select is_nullable
+    from information_schema.columns
+    where table_schema = 'public'
+      and table_name = 'content_items'
+      and column_name = 'review_comment'
+  ),
+  'YES',
+  'content_items.review_comment remains nullable, no default, no backfill'
 );
 
 select has_table('public', 'workspaces', 'workspaces exists');
