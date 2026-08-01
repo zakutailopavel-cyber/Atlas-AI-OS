@@ -24,6 +24,7 @@ type Item = {
   shot_list: string[] | null;
   publish_at: string | null;
   created_by: string;
+  created_at?: string;
   asset_url?: string | null;
   review_comment?: string | null;
   disclosure?: string | null;
@@ -79,7 +80,7 @@ export default function Dashboard({ user }: { user: User }) {
     [models, setModels] = useState<Model[]>([]),
     [items, setItems] = useState<Item[]>([]),
     [assets,setAssets]=useState<Asset[]>([]),
-    [team, setTeam] = useState<{ email: string; role: string }[]>([]),
+    [team, setTeam] = useState<{ id: string; email: string; role: string }[]>([]),
     [loading, setLoading] = useState(true),
     [modelOpen, setModelOpen] = useState<Model | null | undefined>(),
     [contentOpen, setContentOpen] = useState(false),
@@ -99,7 +100,7 @@ export default function Dashboard({ user }: { user: User }) {
         .from("content_items")
         .select("*")
         .order("created_at", { ascending: false }),
-      s.from("profiles").select("email,role").order("created_at"),
+      s.from("profiles").select("id,email,role").order("created_at"),
       s.from("model_references").select("*").order("created_at",{ascending:false}),
       s.from("link_clicks").select("content_item_id"),
       s.from("social_accounts").select("*").order("created_at"),
@@ -197,6 +198,9 @@ export default function Dashboard({ user }: { user: User }) {
     setSelectedItem(null);
     load();
   }
+  const viewModel = viewModelId
+    ? models.find((mo) => mo.id === viewModelId)
+    : undefined;
   return (
     <div className="app">
       <aside>
@@ -210,8 +214,11 @@ export default function Dashboard({ user }: { user: User }) {
           {menu.map((n, i) => (
             <button
               key={n}
-              className={page === n ? "active" : ""}
-              onClick={() => setPage(n)}
+              className={page === n && !viewModelId ? "active" : ""}
+              onClick={() => {
+                setPage(n);
+                setViewModelId(null);
+              }}
             >
               {["▦", "♙", "✦", "▦", "♙", "⚙", "✉"][i]} {n}
             </button>
@@ -228,8 +235,10 @@ export default function Dashboard({ user }: { user: User }) {
       <main>
         <header>
           <div>
-            <small>РАБОЧЕЕ ПРОСТРАНСТВО ATLAS</small>
-            <h1>{page}</h1>
+            <small>
+              {viewModel ? "КАРТОЧКА ПЕРСОНАЖА" : "РАБОЧЕЕ ПРОСТРАНСТВО ATLAS"}
+            </small>
+            <h1>{viewModel ? viewModel.name : page}</h1>
           </div>
           <div className="header-actions">
             <label className="search">⌕ <input placeholder="Поиск…" /><kbd>⌘ K</kbd></label>
@@ -239,7 +248,6 @@ export default function Dashboard({ user }: { user: User }) {
         </header>
         <div className="content">
           {(() => {
-            const viewModel = viewModelId ? models.find((mo) => mo.id === viewModelId) : undefined;
             if (viewModel) {
               return (
                 <CharacterPage
@@ -248,6 +256,7 @@ export default function Dashboard({ user }: { user: User }) {
                   items={items}
                   accounts={socialAccounts}
                   clicks={linkClicks}
+                  team={team}
                   close={() => setViewModelId(null)}
                   saveAccount={saveSocialAccount}
                   deleteAccount={deleteSocialAccount}
@@ -454,6 +463,7 @@ function CharacterPage({
   items,
   accounts,
   clicks,
+  team,
   close,
   saveAccount,
   deleteAccount,
@@ -466,6 +476,7 @@ function CharacterPage({
   items: Item[];
   accounts: SocialAccount[];
   clicks: Record<string, number>;
+  team: { id: string; email: string; role: string }[];
   close: () => void;
   saveAccount: (a: Partial<SocialAccount>) => void;
   deleteAccount: (id: string) => void;
@@ -666,17 +677,23 @@ function CharacterPage({
         {ownItems.length ? (
           <>
             <div className="post-strip">
-              {ownItems.map((i) => (
-                <button
-                  key={i.id}
-                  className={i.id === selected?.id ? "post-chip active" : "post-chip"}
-                  onClick={() => setSelectedId(i.id)}
-                >
-                  <small>{statusLabel[i.status] || i.status}</small>
-                  <span>{i.platform || i.format}</span>
-                  <em>{i.title}</em>
-                </button>
-              ))}
+              {ownItems.map((i) => {
+                const authorEmail = team.find((t) => t.id === i.created_by)?.email;
+                return (
+                  <button
+                    key={i.id}
+                    className={i.id === selected?.id ? "post-chip active" : "post-chip"}
+                    onClick={() => setSelectedId(i.id)}
+                  >
+                    <small>{statusLabel[i.status] || i.status}</small>
+                    <span>{i.platform || i.format}</span>
+                    <em>{i.title}</em>
+                    <i className="post-chip-author">
+                      {authorEmail ? authorEmail.slice(0, 2).toUpperCase() : "?"}
+                    </i>
+                  </button>
+                );
+              })}
             </div>
             {selected && (
               <PostPreviewPanel
@@ -684,6 +701,7 @@ function CharacterPage({
                 item={selected}
                 model={model}
                 clicks={clicks[selected.id] || 0}
+                author={team.find((t) => t.id === selected.created_by)?.email}
                 save={updateItem}
               />
             )}
@@ -699,11 +717,13 @@ function PostPreviewPanel({
   item,
   model,
   clicks,
+  author,
   save,
 }: {
   item: Item;
   model: Model;
   clicks: number;
+  author?: string;
   save: (x: Partial<Item>) => void;
 }) {
   const [draft, setDraft] = useState<Partial<Item>>(item);
@@ -712,6 +732,22 @@ function PostPreviewPanel({
   return (
     <div className="character-preview">
       <div className="social-preview">
+        <div className="post-attribution">
+          <span>
+            {author ? `Автор: ${author}` : "Автор неизвестен"}
+          </span>
+          {item.created_at && (
+            <span>
+              · создано{" "}
+              {new Date(item.created_at).toLocaleString("ru-RU", {
+                day: "numeric",
+                month: "short",
+                hour: "2-digit",
+                minute: "2-digit",
+              })}
+            </span>
+          )}
+        </div>
         <div className="social-bar">
           <b>{model.handle || model.name}</b>
           <span>•••</span>
@@ -926,7 +962,7 @@ function Calendar({ items, open }: { items: Item[]; open: (item: Item) => void }
     </>
   );
 }
-function Team({ team }: { team: { email: string; role: string }[] }) {
+function Team({ team }: { team: { id: string; email: string; role: string }[] }) {
   return (
     <div className="team">
       {team.map((x) => (
