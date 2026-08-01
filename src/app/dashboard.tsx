@@ -719,6 +719,12 @@ function CharacterPage({
     </div>
   );
 }
+function toLocalDateTimeInput(iso?: string | null): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  const offsetMs = d.getTimezoneOffset() * 60000;
+  return new Date(d.getTime() - offsetMs).toISOString().slice(0, 16);
+}
 function PostPreviewPanel({
   item,
   model,
@@ -857,9 +863,7 @@ function PostPreviewPanel({
           Дата публикации
           <input
             type="datetime-local"
-            defaultValue={
-              draft.publish_at ? draft.publish_at.slice(0, 16) : ""
-            }
+            defaultValue={toLocalDateTimeInput(draft.publish_at)}
             onChange={(e) =>
               setDraft({
                 ...draft,
