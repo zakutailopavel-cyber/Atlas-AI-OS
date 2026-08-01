@@ -110,6 +110,7 @@
 
 | Дата | Область | Состояние | Изменение | PR/коммит |
 | --- | --- | --- | --- | --- |
+| 2026-08-01 | 05 | Завершено | PR #99 слит: закрыт drift из `RUNTIME_SCHEMA_DRIFT.md` — additive migration `202608011400` добавила `content_items.asset_url` и `content_items.review_comment` (nullable, без default, без backfill); применено к production Supabase через SQL editor до merge (одобрено пользователем); pgTAP `atlas_schema.sql` обновлён (migration chain + подтверждение nullable bridge-полей вместо "absent"); проверено вживую — сцена, сгенерированная в Студии персонажа, теперь успешно прикрепляется к посту и отображается в превью | PR #99 |
 | 2026-07-31 | 03 | В работе | Draft PR: trend-aware генерация недели (`/api/trends` с `web_search`, один вызов на пайплайн) → локальная проверка на forbidden_topics/disclosure → существующий `/api/plan-week` без изменений логики; добавлена `social_accounts` (метаданные площадок, без OAuth/автопостинга — публикация остаётся ручной) и статические инструкции по загрузке; caption/prompt/review_comment переведены на `PostTextEditor` (автовысота, счётчик символов по лимиту площадки); build/lint без новых ошибок сверх baseline | draft PR |
 | 2026-07-20 | 00 | Завершено | 00-J синхронизировала состояние после merge PR #78: подтверждён `main` `ab7a745`, портфельная стратегия 10 персонажей активна, открытых PR нет; следующий этап — 04-C; production, Supabase Cloud, OpenAI, Modal и социальные платформы не затрагивались | PR #78 / `ab7a745` |
 | 2026-07-20 | 00 | В работе | 00-H синхронизировала PROJECT_STATE после merge PR #75: подтверждён `main` `c5b450b`, 05-K завершена; backfill, production/Supabase Cloud, RLS cutover, OpenAI и Modal не запускались | Issue #76 / draft PR |
@@ -124,7 +125,6 @@
 | 2026-07-18 | 05 | Завершено | PR #57 слит: GitHub Actions rehearsal run `29614156122` подтвердил одинаковый schema hash до/после, history ровно `0600`, `0700`, `0800` и pending `0900`; production/Supabase Cloud не подключались | PR #57 / `8d838a1` |
 | 2026-07-17 | 00 | Завершено | PR #55 слит: подтверждённый `main` — `b4c665a`, активная защита `main` зафиксирована; следующий текущий review — draft PR #57 для Issue #56 | PR #55 / `b4c665a` |
 | 2026-07-17 | 00 | Завершено | PR #53 слит: Project state workflow запускается на каждом PR; GitHub ruleset `Protect main` настроен вручную без изменений из этого PR | PR #53 / `5a0988b` |
-| 2026-07-17 | 05 | Завершено | PR #49 слит: additive tenant foundation `0900` вошла в `main`; без backfill, runtime/UI, production cutover и production-доступа | PR #49 / `792c35d` |
 
 ## Шаблон передачи состояния после работы
 

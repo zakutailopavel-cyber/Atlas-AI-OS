@@ -217,3 +217,11 @@ Runtime должен считать операцию успешной тольк
 - `asset_url` не используется как Storage object identity, cache key или доказательство прав.
 - Additive bridge migration не должна запускать OpenAI или Modal GPU.
 - Revisions/approval cutover выполняется отдельными PR после baseline и tenant boundary.
+
+## 10. Резолюция (2026-08-01, PR #99)
+
+`asset_url` и `review_comment` добавлены как nullable bridge-колонки без default и без backfill — additive migration `202608011400`, точно по спецификации Шага 2 из раздела 8. Применено к production Supabase через SQL editor до merge PR, с явным одобрением пользователя (production DDL требует ручной gate по `AGENTS.md`). pgTAP-инвариант "future non-owner bridge columns are absent" сужен: `asset_url`/`review_comment` исключены из проверки "отсутствует" и вместо этого получили собственные проверки существования и nullable.
+
+Отдельный воспроизводимый baseline PR (Шаг 1) для остальной части `content_items` формально не выполнялся отдельно — на момент этой миграции существующая цепочка migrations (`0600`…`311300`) уже проходит CI и совпадает с production по всем прочим колонкам, поэтому разрыв, который Шаг 1 должен был закрыть, ограничивался именно этими двумя полями и закрыт этой миграцией напрямую.
+
+Шаг 3 (runtime error handling для `attach()`/`updateItem()` — сейчас обе функции по-прежнему не проверяют `{ error }` от Supabase) остаётся открытым и не входит в этот PR.
