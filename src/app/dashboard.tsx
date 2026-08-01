@@ -90,8 +90,13 @@ export default function Dashboard({ user }: { user: User }) {
     [socialAccounts, setSocialAccounts] = useState<SocialAccount[]>([]),
     [linkClicks, setLinkClicks] = useState<Record<string, number>>({}),
     [viewModelId, setViewModelId] = useState<string | null>(null),
-    [avatarPresetModel, setAvatarPresetModel] = useState("");
-  const [selectedItem, setSelectedItem] = useState<Item | null>(null);
+    [avatarPresetModel, setAvatarPresetModel] = useState(""),
+    [focusItemId, setFocusItemId] = useState<string | undefined>(undefined);
+  function openPost(item: Item) {
+    if (!item.model_id) return;
+    setViewModelId(item.model_id);
+    setFocusItemId(item.id);
+  }
   async function load() {
     setLoading(true);
     const [m, c, t, a, lc, sa] = await Promise.all([
@@ -195,7 +200,6 @@ export default function Dashboard({ user }: { user: User }) {
         tracking_destination_url: item.tracking_destination_url,
       })
       .eq("id", item.id);
-    setSelectedItem(null);
     load();
   }
   const viewModel = viewModelId
@@ -257,7 +261,11 @@ export default function Dashboard({ user }: { user: User }) {
                   accounts={socialAccounts}
                   clicks={linkClicks}
                   team={team}
-                  close={() => setViewModelId(null)}
+                  initialItemId={focusItemId}
+                  close={() => {
+                    setViewModelId(null);
+                    setFocusItemId(undefined);
+                  }}
                   saveAccount={saveSocialAccount}
                   deleteAccount={deleteSocialAccount}
                   saveModel={saveModel}
@@ -270,6 +278,7 @@ export default function Dashboard({ user }: { user: User }) {
                     setWeekPresetModel(id);
                     setWeekOpen(true);
                   }}
+                  reload={load}
                 />
               );
             }
@@ -281,7 +290,7 @@ export default function Dashboard({ user }: { user: User }) {
                     items={items}
                     create={() => setContentOpen(true)}
                     nav={setPage}
-                    openItem={setSelectedItem}
+                    openItem={openPost}
                     openModel={(id) => setViewModelId(id)}
                   />
                 )}{" "}
@@ -299,11 +308,11 @@ export default function Dashboard({ user }: { user: User }) {
                     models={models}
                     add={() => setContentOpen(true)}
                     status={status}
-                    open={setSelectedItem}
+                    open={openPost}
                     plan={() => setWeekOpen(true)}
                   />
                 )}{" "}
-                {page === "Календарь" && <Calendar items={items} open={setSelectedItem} />}{" "}
+                {page === "Календарь" && <Calendar items={items} models={models} open={openPost} />}{" "}
                 {page === "Команда" && <Team team={team} />}{" "}
                 {page === "Настройки" && <Settings user={user} />}{" "}
                 {page === "Фан-чат" && <FanReply models={models} />}
@@ -335,16 +344,6 @@ export default function Dashboard({ user }: { user: User }) {
         />
       )}
       {avatarOpen && <AvatarStudio models={models} items={items} assets={assets} initialModelId={avatarPresetModel} close={()=>{setAvatarOpen(false);setAvatarPresetModel("")}} savePortrait={async(model,url)=>{const passport={...(model.visual_passport||{}),avatar:url};await s.from("ai_models").update({visual_passport:passport}).eq("id",model.id);await s.from("model_references").update({kind:"reference"}).eq("model_id",model.id).eq("kind","primary");await s.from("model_references").insert({model_id:model.id,storage_path:url,kind:"primary",created_by:user.id});await load();}} saveAsset={async(model,url,jobId)=>{if(!assets.some(a=>a.storage_path===url))await s.from("model_references").insert({model_id:model.id,storage_path:url,kind:"reference",generation_job_id:jobId,created_by:user.id});await load();}} attach={async(itemId,url)=>{await s.from("content_items").update({asset_url:url}).eq("id",itemId);await load();}} />}
-      {selectedItem && (
-        <PublicationDialog
-          item={selectedItem}
-          model={models.find((m) => m.id === selectedItem.model_id)}
-          close={() => setSelectedItem(null)}
-          save={updateItem}
-          onApproved={load}
-          clicks={linkClicks[selectedItem.id] || 0}
-        />
-      )}
       {weekOpen && (
         <WeekPlanner
           models={models}
@@ -464,6 +463,7 @@ function CharacterPage({
   accounts,
   clicks,
   team,
+  initialItemId,
   close,
   saveAccount,
   deleteAccount,
@@ -471,12 +471,14 @@ function CharacterPage({
   updateItem,
   openAvatar,
   generateWeek,
+  reload,
 }: {
   model: Model;
   items: Item[];
   accounts: SocialAccount[];
   clicks: Record<string, number>;
   team: { id: string; email: string; role: string }[];
+  initialItemId?: string;
   close: () => void;
   saveAccount: (a: Partial<SocialAccount>) => void;
   deleteAccount: (id: string) => void;
@@ -484,6 +486,7 @@ function CharacterPage({
   updateItem: (x: Partial<Item>) => void;
   openAvatar: () => void;
   generateWeek: (modelId: string) => void;
+  reload: () => void;
 }) {
   const [m, setM] = useState<Partial<Model>>(model);
   const [now] = useState(() => Date.now());
@@ -500,7 +503,9 @@ function CharacterPage({
       if (aUp && bUp) return af - bf;
       return 0;
     });
-  const [selectedId, setSelectedId] = useState(ownItems[0]?.id || "");
+  const [selectedId, setSelectedId] = useState(
+    initialItemId || ownItems[0]?.id || "",
+  );
   const selected =
     ownItems.find((i) => i.id === selectedId) || ownItems[0] || null;
   const ownAccounts = accounts.filter((a) => a.model_id === model.id);
@@ -703,6 +708,7 @@ function CharacterPage({
                 clicks={clicks[selected.id] || 0}
                 author={team.find((t) => t.id === selected.created_by)?.email}
                 save={updateItem}
+                reload={reload}
               />
             )}
           </>
@@ -719,23 +725,56 @@ function PostPreviewPanel({
   clicks,
   author,
   save,
+  reload,
 }: {
   item: Item;
   model: Model;
   clicks: number;
   author?: string;
   save: (x: Partial<Item>) => void;
+  reload: () => void;
 }) {
-  const [draft, setDraft] = useState<Partial<Item>>(item);
+  const [draft, setDraft] = useState<Partial<Item>>(item),
+    [approving, setApproving] = useState(false),
+    [approveError, setApproveError] = useState(""),
+    [linkCopied, setLinkCopied] = useState(false);
   const trackingLink =
     typeof window !== "undefined" ? `${window.location.origin}/api/l/${item.id}` : "";
+  async function copyTrackingLink() {
+    await navigator.clipboard.writeText(trackingLink);
+    setLinkCopied(true);
+  }
+  async function approve() {
+    setApproving(true);
+    setApproveError("");
+    try {
+      const r = await fetch("/api/approve", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          content_item_id: item.id,
+          title: draft.title,
+          caption: draft.caption,
+          visual_prompt: draft.visual_prompt,
+          disclosure: draft.disclosure,
+          asset_url: draft.asset_url,
+          review_comment: draft.review_comment,
+        }),
+      });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error || "Не удалось согласовать");
+      reload();
+    } catch (e) {
+      setApproveError(e instanceof Error ? e.message : "Ошибка согласования");
+    } finally {
+      setApproving(false);
+    }
+  }
   return (
     <div className="character-preview">
       <div className="social-preview">
         <div className="post-attribution">
-          <span>
-            {author ? `Автор: ${author}` : "Автор неизвестен"}
-          </span>
+          <span>{author ? `Автор: ${author}` : "Автор неизвестен"}</span>
           {item.created_at && (
             <span>
               · создано{" "}
@@ -787,32 +826,108 @@ function PostPreviewPanel({
         <small className="disclosure-preview">
           {draft.disclosure || "⚠ Дисклоуз не задан"}
         </small>
+        {draft.trend_note && (
+          <small className="trend-note-preview">
+            Учтён тренд на момент генерации: {draft.trend_note}
+          </small>
+        )}
         {draft.platform && UPLOAD_GUIDES[draft.platform] && (
           <div className="upload-guide">
             <b>Куда и как загрузить · {draft.platform}</b>
             <p>{UPLOAD_GUIDES[draft.platform]}</p>
           </div>
         )}
+      </div>
+      <div className="character-preview-actions form">
+        <label>
+          Статус
+          <select
+            value={draft.status || "draft"}
+            onChange={(e) => setDraft({ ...draft, status: e.target.value })}
+          >
+            <option value="draft">Черновик</option>
+            <option value="review">На проверке</option>
+            <option value="ready" disabled>
+              Согласовано (только через кнопку «Согласовать»)
+            </option>
+            <option value="published">Опубликовано</option>
+          </select>
+        </label>
+        <label>
+          Дата публикации
+          <input
+            type="datetime-local"
+            defaultValue={
+              draft.publish_at ? draft.publish_at.slice(0, 16) : ""
+            }
+            onChange={(e) =>
+              setDraft({
+                ...draft,
+                publish_at: e.target.value
+                  ? new Date(e.target.value).toISOString()
+                  : null,
+              })
+            }
+          />
+        </label>
+        <label>
+          Визуальный промпт
+          <PostTextEditor
+            value={draft.visual_prompt || ""}
+            onChange={(v) => setDraft({ ...draft, visual_prompt: v })}
+          />
+        </label>
+        <label>
+          AI-дисклоуз перед публикацией
+          <input
+            value={draft.disclosure || ""}
+            onChange={(e) => setDraft({ ...draft, disclosure: e.target.value })}
+          />
+        </label>
+        <label>
+          Куда ведёт трафик (Fanvue-профиль, ссылка на подписку и т.п.)
+          <input
+            value={draft.tracking_destination_url || ""}
+            onChange={(e) =>
+              setDraft({ ...draft, tracking_destination_url: e.target.value })
+            }
+            placeholder="https://www.fanvue.com/..."
+          />
+        </label>
         {draft.tracking_destination_url && (
           <div className="tracking-link-box">
-            <span>Трек-ссылка:</span>
+            <span>Трек-ссылка для био/подписи:</span>
             <code>{trackingLink}</code>
-            <small>{clicks} клик(ов)</small>
+            <button type="button" onClick={copyTrackingLink}>
+              {linkCopied ? "✓ Скопировано" : "Скопировать"}
+            </button>
+            <small>{clicks} клик(ов) зафиксировано</small>
           </div>
         )}
-      </div>
-      <div className="character-preview-actions">
-        <select
-          value={draft.status || "draft"}
-          onChange={(e) => setDraft({ ...draft, status: e.target.value })}
-        >
-          <option value="draft">Черновик</option>
-          <option value="review">На проверке</option>
-          <option value="ready">Согласовано</option>
-          <option value="published">Опубликовано</option>
-        </select>
-        <button onClick={() => save({ ...draft, id: item.id })}>
-          Сохранить изменения
+        <label>
+          Комментарий редактора
+          <PostTextEditor
+            value={draft.review_comment || ""}
+            onChange={(v) => setDraft({ ...draft, review_comment: v })}
+            placeholder="Что изменить или проверить?"
+          />
+        </label>
+        {approveError && (
+          <strong className="generation-error">{approveError}</strong>
+        )}
+        <div className="character-preview-buttons">
+          <button
+            className="secondary"
+            onClick={() => save({ ...draft, id: item.id, status: "review" })}
+          >
+            Вернуть на проверку
+          </button>
+          <button onClick={() => save({ ...draft, id: item.id })}>
+            Сохранить изменения
+          </button>
+        </div>
+        <button className="approve-button" onClick={approve} disabled={approving}>
+          {approving ? "Согласуем…" : "✓ Согласовать"}
         </button>
       </div>
     </div>
@@ -821,7 +936,7 @@ function PostPreviewPanel({
 function ModelCards({models,edit}:{models:Model[];edit?:(m:Model)=>void}) {
   return <div className="models">{models.slice(0, edit ? undefined : 3).map((m,i)=><article key={m.id} onClick={()=>edit?.(m)}>
     <div className={`portrait p${i%3}`}>{m.visual_passport?.avatar&&<img src={m.visual_passport.avatar} alt={m.name}/>} 
-      <small>{m.status === "active" ? "Активна" : "Черновик"}</small><button onClick={(e)=>e.stopPropagation()}>•••</button>
+      <small>{m.status === "active" ? "Активна" : "Черновик"}</small>
     </div>
     <div className="model-copy"><h3>{m.name}<span>↗</span></h3><label>{m.handle || "Профиль не указан"}</label><p>{m.niche || "Ниша не указана"}</p>
       <div className="model-metrics"><b>—<small>Подписчики</small></b><b>—<small>Рост за 30 дней</small></b><b>—<small>Публикации</small></b></div>
@@ -919,7 +1034,15 @@ function ContentList({
     </div>
   );
 }
-function Calendar({ items, open }: { items: Item[]; open: (item: Item) => void }) {
+function Calendar({
+  items,
+  models,
+  open,
+}: {
+  items: Item[];
+  models: Model[];
+  open: (item: Item) => void;
+}) {
   const planned = items.filter((x) => x.publish_at);
   return (
     <>
@@ -944,6 +1067,7 @@ function Calendar({ items, open }: { items: Item[]; open: (item: Item) => void }
                 <div>
                   <b>{x.title}</b>
                   <p>
+                    {models.find((m) => m.id === x.model_id)?.name || "Без модели"} ·{" "}
                     {x.platform} · {x.format}
                   </p>
                 </div>
@@ -2082,236 +2206,6 @@ function PostTextEditor({
         </span>
       </div>
     </div>
-  );
-}
-function PublicationDialog({
-  item,
-  model,
-  close,
-  save,
-  onApproved,
-  clicks,
-}: {
-  item: Item;
-  model?: Model;
-  close: () => void;
-  save: (x: Partial<Item>) => void;
-  onApproved: () => void;
-  clicks: number;
-}) {
-  const [draft, setDraft] = useState<Partial<Item>>(item),
-    [tab, setTab] = useState("Предпросмотр"),
-    [approving, setApproving] = useState(false),
-    [approveError, setApproveError] = useState(""),
-    [linkCopied, setLinkCopied] = useState(false);
-  const trackingLink =
-    typeof window !== "undefined" ? `${window.location.origin}/api/l/${item.id}` : "";
-  async function copyTrackingLink() {
-    await navigator.clipboard.writeText(trackingLink);
-    setLinkCopied(true);
-  }
-  async function approve() {
-    setApproving(true);
-    setApproveError("");
-    try {
-      const r = await fetch("/api/approve", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          content_item_id: item.id,
-          title: draft.title,
-          caption: draft.caption,
-          visual_prompt: draft.visual_prompt,
-          disclosure: draft.disclosure,
-          asset_url: draft.asset_url,
-          review_comment: draft.review_comment,
-        }),
-      });
-      const d = await r.json();
-      if (!r.ok) throw new Error(d.error || "Не удалось согласовать");
-      onApproved();
-      close();
-    } catch (e) {
-      setApproveError(
-        e instanceof Error ? e.message : "Ошибка согласования",
-      );
-    } finally {
-      setApproving(false);
-    }
-  }
-  return (
-    <Modal close={close}>
-      <div className="publication-head">
-        <div>
-          <small>
-            {draft.platform} · {draft.format}
-          </small>
-          <h2>{draft.title}</h2>
-          <p>{model?.name || "Без модели"}</p>
-        </div>
-        <select
-          value={draft.status}
-          onChange={(e) => setDraft({ ...draft, status: e.target.value })}
-        >
-          <option value="draft">Черновик</option>
-          <option value="review">На проверке</option>
-          <option value="ready" disabled>
-            Согласовано (только через вкладку «Согласование»)
-          </option>
-          <option value="published">Опубликовано</option>
-        </select>
-      </div>
-      <div className="publication-tabs">
-        {["Предпросмотр", "Материалы", "Согласование"].map((x) => (
-          <button
-            key={x}
-            className={tab === x ? "active" : ""}
-            onClick={() => setTab(x)}
-          >
-            {x}
-          </button>
-        ))}
-      </div>
-      {tab === "Предпросмотр" && (
-        <div className="social-preview">
-          <div className="social-bar">
-            <b>{model?.handle || model?.name}</b>
-            <span>•••</span>
-          </div>
-          <div className="visual-stage">
-            {draft.asset_url ? (
-              <img src={draft.asset_url} alt={draft.title ? `Визуал публикации «${draft.title}»` : "Визуал публикации"} />
-            ) : (
-              <div>
-                <b>Визуал ещё не прикреплён</b>
-                <span>Добавь ссылку во вкладке «Материалы»</span>
-              </div>
-            )}
-          </div>
-          <p>{draft.caption}</p>
-          <small className="disclosure-preview">
-            {draft.disclosure || "⚠ Дисклоуз не задан"}
-          </small>
-          {draft.trend_note && (
-            <small className="trend-note-preview">
-              Учтён тренд на момент генерации: {draft.trend_note}
-            </small>
-          )}
-        </div>
-      )}
-      {tab === "Материалы" && (
-        <div className="form">
-          <label>
-            Куда ведёт трафик (Fanvue-профиль, ссылка на подписку и т.п.)
-            <input
-              value={draft.tracking_destination_url || ""}
-              onChange={(e) =>
-                setDraft({ ...draft, tracking_destination_url: e.target.value })
-              }
-              placeholder="https://www.fanvue.com/..."
-            />
-          </label>
-          {draft.tracking_destination_url && (
-            <div className="tracking-link-box">
-              <span>Трек-ссылка для био/подписи:</span>
-              <code>{trackingLink}</code>
-              <button type="button" onClick={copyTrackingLink}>
-                {linkCopied ? "✓ Скопировано" : "Скопировать"}
-              </button>
-              <small>{clicks} клик(ов) зафиксировано</small>
-            </div>
-          )}
-          <label>
-            Ссылка на готовое изображение
-            <input
-              value={draft.asset_url || ""}
-              onChange={(e) =>
-                setDraft({ ...draft, asset_url: e.target.value })
-              }
-              placeholder="https://..."
-            />
-          </label>
-          <label>
-            Текст публикации
-            <PostTextEditor
-              value={draft.caption || ""}
-              onChange={(v) => setDraft({ ...draft, caption: v })}
-              platform={draft.platform}
-            />
-          </label>
-          <label>
-            Визуальный промпт
-            <PostTextEditor
-              value={draft.visual_prompt || ""}
-              onChange={(v) => setDraft({ ...draft, visual_prompt: v })}
-            />
-          </label>
-          {draft.platform && UPLOAD_GUIDES[draft.platform] && (
-            <div className="upload-guide">
-              <b>Куда и как загрузить · {draft.platform}</b>
-              <p>{UPLOAD_GUIDES[draft.platform]}</p>
-            </div>
-          )}
-          <label>
-            Дата публикации
-            <input
-              type="datetime-local"
-              onChange={(e) =>
-                setDraft({
-                  ...draft,
-                  publish_at: e.target.value
-                    ? new Date(e.target.value).toISOString()
-                    : null,
-                })
-              }
-            />
-          </label>
-        </div>
-      )}
-      {tab === "Согласование" && (
-        <div className="approval">
-          <div className="approval-state">
-            <b>
-              {draft.status === "ready"
-                ? "✓ Материал согласован"
-                : "Материал ожидает решения"}
-            </b>
-            <p>Оставь комментарий для команды или измени статус публикации.</p>
-          </div>
-          <label>
-            AI-дисклоуз перед публикацией
-            <input
-              value={draft.disclosure || ""}
-              onChange={(e) =>
-                setDraft({ ...draft, disclosure: e.target.value })
-              }
-            />
-          </label>
-          <label>
-            Комментарий редактора
-            <PostTextEditor
-              value={draft.review_comment || ""}
-              onChange={(v) => setDraft({ ...draft, review_comment: v })}
-              placeholder="Что изменить или проверить?"
-            />
-          </label>
-          {approveError && (
-            <strong className="generation-error">{approveError}</strong>
-          )}
-          <div className="approval-buttons">
-            <button onClick={() => setDraft({ ...draft, status: "review" })}>
-              Вернуть на проверку
-            </button>
-            <button onClick={approve} disabled={approving}>
-              {approving ? "Согласуем…" : "✓ Согласовать"}
-            </button>
-          </div>
-        </div>
-      )}
-      <button className="save-publication" onClick={() => save(draft)}>
-        Сохранить изменения
-      </button>
-    </Modal>
   );
 }
 function Modal({
