@@ -241,6 +241,8 @@ export default function Dashboard({ user }: { user: User }) {
               models={models}
               items={items}
               create={() => setContentOpen(true)}
+              nav={setPage}
+              openItem={setSelectedItem}
             />
           )}{" "}
           {page === "AI-модели" && (
@@ -261,7 +263,7 @@ export default function Dashboard({ user }: { user: User }) {
               plan={() => setWeekOpen(true)}
             />
           )}{" "}
-          {page === "Календарь" && <Calendar items={items} />}{" "}
+          {page === "Календарь" && <Calendar items={items} open={setSelectedItem} />}{" "}
           {page === "Команда" && <Team team={team} />}{" "}
           {page === "Настройки" && <Settings user={user} />}{" "}
           {page === "Фан-чат" && <FanReply models={models} />}
@@ -320,10 +322,14 @@ function Home({
   models,
   items,
   create,
+  nav,
+  openItem,
 }: {
   models: Model[];
   items: Item[];
   create: () => void;
+  nav: (page: string) => void;
+  openItem: (item: Item) => void;
 }) {
   const [renderedAt] = useState(() => Date.now());
   const ready = items.filter((x) => x.status === "ready" || x.status === "published").length;
@@ -359,11 +365,11 @@ function Home({
           </article>
         ))}
       </div>
-      <div className="section-heading"><div><small>ТВОИ ЦИФРОВЫЕ АВТОРЫ</small><h2>AI-модели</h2></div><span>Показать все ›</span></div>
+      <div className="section-heading"><div><small>ТВОИ ЦИФРОВЫЕ АВТОРЫ</small><h2>AI-модели</h2></div><span className="link-action" onClick={() => nav("AI-модели")}>Показать все ›</span></div>
       <ModelCards models={models} />
-      <div className="section-heading queue-heading"><div><small>ЛИНИЯ ПРОИЗВОДСТВА</small><h2>Очередь на сегодня</h2></div><span>Открыть календарь ›</span></div>
+      <div className="section-heading queue-heading"><div><small>ЛИНИЯ ПРОИЗВОДСТВА</small><h2>Очередь на сегодня</h2></div><span className="link-action" onClick={() => nav("Календарь")}>Открыть календарь ›</span></div>
       {scheduled ? <section className="today-queue">
-        <div><small>◷ СЛЕДУЮЩАЯ ПУБЛИКАЦИЯ · {new Date(scheduled.publish_at!).toLocaleTimeString("ru-RU",{hour:"2-digit",minute:"2-digit"})}</small><h3>{scheduled.title}</h3><p>{scheduledModel?.name || "Без модели"} · {scheduled.format || scheduled.platform}</p><button>▶ Предпросмотр</button></div>
+        <div><small>◷ СЛЕДУЮЩАЯ ПУБЛИКАЦИЯ · {new Date(scheduled.publish_at!).toLocaleTimeString("ru-RU",{hour:"2-digit",minute:"2-digit"})}</small><h3>{scheduled.title}</h3><p>{scheduledModel?.name || "Без модели"} · {scheduled.format || scheduled.platform}</p><button onClick={() => openItem(scheduled)}>▶ Предпросмотр</button></div>
         <ul><li>Текст подготовлен <b>{scheduled.caption ? "Готово" : "Нужно заполнить"}</b></li><li>Визуал прикреплён <b>{scheduled.asset_url ? "Готово" : "Проверить"}</b></li><li>Статус публикации <b>{scheduled.status === "ready" ? "Готово" : "В работе"}</b></li></ul>
       </section> : <Empty text="Запланируй публикацию — она появится здесь" action={create} />}
     </>
@@ -508,7 +514,7 @@ function ContentList({
     </div>
   );
 }
-function Calendar({ items }: { items: Item[] }) {
+function Calendar({ items, open }: { items: Item[]; open: (item: Item) => void }) {
   const planned = items.filter((x) => x.publish_at);
   return (
     <>
@@ -523,7 +529,7 @@ function Calendar({ items }: { items: Item[] }) {
               String(a.publish_at).localeCompare(String(b.publish_at)),
             )
             .map((x) => (
-              <article key={x.id}>
+              <article key={x.id} onClick={() => open(x)}>
                 <time>
                   {new Date(x.publish_at!).toLocaleDateString("ru-RU", {
                     day: "2-digit",
