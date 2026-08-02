@@ -186,12 +186,25 @@ class SceneGenerator:
 # IP-Adapter-plus-face used by SceneGenerator) restricted to a masked face
 # region via SDXL inpainting, so the rest of the photo is left alone.
 
+# Face-region checkpoint: RealVisXL_V4.0's dedicated inpainting fork, not
+# vanilla SDXL-base. The first live test (chat 2026-08-02) completed
+# end-to-end but the swapped face came out visibly smoother/flatter than
+# the real, untouched pixels around it -- vanilla SDXL-base is a generalist
+# checkpoint with a soft, slightly "airbrushed" skin prior. RealVisXL_V4.0
+# is a photorealism-tuned fine-tune (real pores/texture), and this specific
+# fork (OzzyGT/RealVisXL_V4.0_inpainting) ships a proper 9-channel
+# inpainting UNet instead of the 4-channel latent-blend workaround, which
+# should also tighten the mask seam. Same SDXL attention architecture, so
+# IP-Adapter FaceID loads onto it exactly as before. Not reused for
+# AvatarGenerator/SceneGenerator -- RealVisXL's "checkpoint face" bias
+# (see BFL switch above) is a non-issue here because identity comes from
+# the reference photo, not the text prompt.
 def download_faceid_models():
     from transformers import CLIPVisionModelWithProjection
     from diffusers import AutoPipelineForInpainting
     from insightface.app import FaceAnalysis
     encoder = CLIPVisionModelWithProjection.from_pretrained("h94/IP-Adapter", subfolder="models/image_encoder")
-    pipe = AutoPipelineForInpainting.from_pretrained("stabilityai/stable-diffusion-xl-base-1.0", image_encoder=encoder)
+    pipe = AutoPipelineForInpainting.from_pretrained("OzzyGT/RealVisXL_V4.0_inpainting", image_encoder=encoder, variant="fp16")
     pipe.load_ip_adapter("h94/IP-Adapter-FaceID", subfolder=None, weight_name="ip-adapter-faceid-plusv2_sdxl.bin", image_encoder_folder=None)
     # Pre-downloads insightface's buffalo_l detection/recognition pack so the
     # container doesn't fetch it from GitHub releases on every cold start.
@@ -238,7 +251,7 @@ class FaceSwapGenerator:
         encoder = CLIPVisionModelWithProjection.from_pretrained(
             "h94/IP-Adapter", subfolder="models/image_encoder", torch_dtype=torch.float16)
         self.pipe = AutoPipelineForInpainting.from_pretrained(
-            "stabilityai/stable-diffusion-xl-base-1.0", image_encoder=encoder,
+            "OzzyGT/RealVisXL_V4.0_inpainting", image_encoder=encoder,
             torch_dtype=torch.float16, variant="fp16").to("cuda")
         self.pipe.load_ip_adapter(
             "h94/IP-Adapter-FaceID", subfolder=None,
