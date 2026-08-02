@@ -71,22 +71,27 @@ export async function GET(){
 
 export async function POST(request:Request){
   const {supabase,user}=await session();if(!user)return NextResponse.json({error:"Требуется авторизация"},{status:401});
-  const body=await request.json(),kind=body.kind==="scene"?"scene":"avatar";
+  const body=await request.json(),kind=body.kind==="scene"?"scene":body.kind==="faceswap"?"faceswap":"avatar";
   if(!body.model_id)return NextResponse.json({error:"Выбери AI-модель"},{status:400});
   const {data:model}=await supabase.from("ai_models").select("id,name,visual_passport").eq("id",body.model_id).single();if(!model)return NextResponse.json({error:"Модель не найдена"},{status:404});
   if(kind==="avatar"&&!model.visual_passport?.appearance?.trim())return NextResponse.json({error:"Сначала заполни внешность в профиле AI-модели"},{status:400});
   if(kind==="scene"&&!body.prompt?.trim())return NextResponse.json({error:"Опиши сцену, одежду и действие"},{status:400});
   if(kind==="scene"&&!model.visual_passport?.avatar)return NextResponse.json({error:"Сначала выбери эталонное лицо"},{status:400});
+  if(kind==="faceswap"&&!model.visual_passport?.avatar)return NextResponse.json({error:"Сначала выбери эталонное лицо"},{status:400});
+  if(kind==="faceswap"&&!body.base_photo_url)return NextResponse.json({error:"Сначала загрузи фото"},{status:400});
   const blueprint=identityBlueprint(model.id as string);
   const profileAppearance=[model.visual_passport?.appearance,model.visual_passport?.style,model.visual_passport?.immutable_facts].filter(Boolean).join(". ");
   const framing=sceneFraming(body.framing);
-  const optimizedPrompt=kind==="scene"?`${SCENE_FRAMING[framing]}, ${await optimizeScenePrompt(body.prompt,framing)}`:await optimizeAvatarPrompt(body.prompt||"",profileAppearance,blueprint);
-  const count=kind==="scene"?1:Math.min(Number(body.count)||1,3);
+  // faceswap doesn't run the scene/avatar prompt optimizers -- it's just an
+  // optional short mood/lighting note layered onto an existing real photo,
+  // not a from-scratch scene description.
+  const optimizedPrompt=kind==="scene"?`${SCENE_FRAMING[framing]}, ${await optimizeScenePrompt(body.prompt,framing)}`:kind==="faceswap"?String(body.prompt||"").slice(0,200):await optimizeAvatarPrompt(body.prompt||"",profileAppearance,blueprint);
+  const count=kind==="scene"||kind==="faceswap"?1:Math.min(Number(body.count)||1,3);
   const savedSeed=Number.parseInt(model.visual_passport?.seed||"",10);
   const seed=Number.isFinite(savedSeed)?savedSeed:hash(model.id as string);
   const {data:job,error}=await supabase.from("generation_jobs").insert({model_id:model.id,kind,prompt:body.prompt||"Профиль AI-модели",style:body.style||"photorealistic",count,status:"queued",created_by:user.id}).select("*").single();
   if(error)return NextResponse.json({error:"Очередь генераций не настроена"},{status:503});
-  if(process.env.MODAL_AVATAR_URL){try{const response=await fetch(process.env.MODAL_AVATAR_URL,{method:"POST",headers:{"content-type":"application/json","x-atlas-secret":process.env.ATLAS_WORKER_SECRET||""},body:JSON.stringify({job_id:job.id,model,request:{kind,prompt:optimizedPrompt,style:body.style,framing,count,seed,identity_blueprint:blueprint,reference_url:model.visual_passport?.avatar||null,source_url:body.source_url||null}})});if(!response.ok)throw new Error(`Modal ${response.status}`)}catch(error){await supabase.from("generation_jobs").update({status:"failed",error:error instanceof Error?error.message:"Облачный генератор недоступен"}).eq("id",job.id)}}
+  if(process.env.MODAL_AVATAR_URL){try{const response=await fetch(process.env.MODAL_AVATAR_URL,{method:"POST",headers:{"content-type":"application/json","x-atlas-secret":process.env.ATLAS_WORKER_SECRET||""},body:JSON.stringify({job_id:job.id,model,request:{kind,prompt:optimizedPrompt,style:body.style,framing,count,seed,identity_blueprint:blueprint,reference_url:model.visual_passport?.avatar||null,source_url:body.source_url||null,base_photo_url:body.base_photo_url||null}})});if(!response.ok)throw new Error(`Modal ${response.status}`)}catch(error){await supabase.from("generation_jobs").update({status:"failed",error:error instanceof Error?error.message:"Облачный генератор недоступен"}).eq("id",job.id)}}
   return NextResponse.json({job,worker_connected:Boolean(process.env.MODAL_AVATAR_URL)});
 }
 

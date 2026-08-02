@@ -317,6 +317,23 @@ class FaceSwapGenerator:
         result.save(buffer, format="JPEG", quality=93)
         return buffer.getvalue()
 
+    @modal.method()
+    def generate(self, payload: dict):
+        from PIL import Image
+        db, job_id = database(), payload["job_id"]
+        db.table("generation_jobs").update({"status":"processing","started_at":datetime.now(timezone.utc).isoformat()}).eq("id", job_id).execute()
+        try:
+            request = payload["request"]
+            # Same field shape as SceneGenerator: reference_url is the
+            # model's locked canonical face (set server-side in
+            # /api/avatar, not user-controlled). base_photo_url is the
+            # photo the user manually uploaded in AvatarStudio.
+            data = self.swap(request["base_photo_url"], request["reference_url"], request.get("prompt", ""))
+            picture = Image.open(io.BytesIO(data)).convert("RGB")
+            save_results(db, payload, [picture])
+        except Exception as error:
+            db.table("generation_jobs").update({"status":"failed","error":str(error)[:500],"completed_at":datetime.now(timezone.utc).isoformat()}).eq("id", job_id).execute(); raise
+
 
 @app.local_entrypoint()
 def test_faceswap(base_photo_url: str, identity_url: str, prompt: str = "", out: str = "faceswap_test.jpg"):
@@ -332,6 +349,8 @@ async def submit(request: Request):
     if request.headers.get("x-atlas-secret") != os.environ["ATLAS_WORKER_SECRET"]:
         raise HTTPException(status_code=401, detail="Unauthorized")
     payload = await request.json()
-    if payload.get("request", {}).get("kind") == "scene": SceneGenerator().generate.spawn(payload)
+    kind = payload.get("request", {}).get("kind")
+    if kind == "scene": SceneGenerator().generate.spawn(payload)
+    elif kind == "faceswap": FaceSwapGenerator().generate.spawn(payload)
     else: AvatarGenerator().generate.spawn(payload)
     return {"accepted": True}

@@ -2,7 +2,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 
-select plan(36);
+select plan(37);
 
 select has_table('public', 'profiles', 'profiles exists');
 select has_table('public', 'ai_models', 'ai_models exists');
@@ -26,9 +26,10 @@ select is(
     '202607202300',
     '202607211500',
     '202607311300',
-    '202608011400'
+    '202608011400',
+    '202608021500'
   ]::text[],
-  'the complete 0600 -> 0700 -> 0800 -> 0900 -> 1000 -> 1200 -> 1800 -> 2300 -> 1500 -> 311300 -> 011400 chain is recorded'
+  'the complete 0600 -> 0700 -> 0800 -> 0900 -> 1000 -> 1200 -> 1800 -> 2300 -> 1500 -> 311300 -> 011400 -> 021500 chain is recorded'
 );
 
 select set_eq(
@@ -144,6 +145,14 @@ select set_eq(
       ('content_items_owner_id_fkey')
   $$,
   'Atlas constraints match the baseline chain'
+);
+
+select matches(
+  pg_get_constraintdef(
+    (select oid from pg_constraint where conname = 'generation_jobs_kind_check')
+  ),
+  'faceswap',
+  'generation_jobs.kind check constraint now permits faceswap'
 );
 
 select is(
