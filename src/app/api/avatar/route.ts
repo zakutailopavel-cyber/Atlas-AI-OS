@@ -53,6 +53,15 @@ const DISTINCTIVE_DETAILS=[
 function hash(value:string){return Array.from(value).reduce((result,char)=>(result*31+char.charCodeAt(0))>>>0,2166136261)}
 function identityBlueprint(modelId:string){const value=hash(modelId);return `${FACE_BLUEPRINTS[value%FACE_BLUEPRINTS.length]}, ${DISTINCTIVE_DETAILS[(value>>>8)%DISTINCTIVE_DETAILS.length]}`}
 
+// Cost governor estimate (USD per generation), same caveat as fan-reply's
+// ledger entries: approximate, not exact billing reconciliation. "avatar"
+// calls Black Forest Labs' hosted FLUX.1[dev] API (~$0.025/image per
+// modal/atlas_avatar.py); "scene" and "faceswap" run on self-hosted Modal
+// A10G GPU -- these are rounded up from raw GPU-second math to leave
+// headroom for cold starts, since under-estimating defeats the point of a
+// spend governor.
+const GENERATION_COST_USD={avatar:0.025,scene:0.04,faceswap:0.06} as const;
+
 async function optimizeAvatarPrompt(source:string,appearance:string,blueprint:string){
   if(!process.env.OPENAI_API_KEY)return `${source}. ${appearance}. Identity geometry: ${blueprint}`.slice(0,750);
   try{
@@ -79,6 +88,13 @@ export async function POST(request:Request){
   if(kind==="scene"&&!model.visual_passport?.avatar)return NextResponse.json({error:"Сначала выбери эталонное лицо"},{status:400});
   if(kind==="faceswap"&&!model.visual_passport?.avatar)return NextResponse.json({error:"Сначала выбери эталонное лицо"},{status:400});
   if(kind==="faceswap"&&!body.base_photo_url)return NextResponse.json({error:"Сначала загрузи фото"},{status:400});
+  // Budget check happens before any paid generation is queued -- a retried
+  // job creates a brand-new billed GPU/API call, so this has to gate job
+  // creation itself, not just the first attempt. Same best-effort pattern
+  // as /api/fan-reply: an RPC error logs and continues, a real breach blocks.
+  const {data:overBudget,error:budgetError}=await supabase.rpc("is_over_budget",{target_model_id:model.id});
+  if(budgetError)console.error("Budget check failed",budgetError);
+  else if(overBudget)return NextResponse.json({error:"Достигнут установленный бюджетный лимит для этой модели. Подними лимит в budget_limits, чтобы продолжить генерацию."},{status:402});
   const blueprint=identityBlueprint(model.id as string);
   const profileAppearance=[model.visual_passport?.appearance,model.visual_passport?.style,model.visual_passport?.immutable_facts].filter(Boolean).join(". ");
   const framing=sceneFraming(body.framing);
@@ -91,6 +107,13 @@ export async function POST(request:Request){
   const seed=Number.isFinite(savedSeed)?savedSeed:hash(model.id as string);
   const {data:job,error}=await supabase.from("generation_jobs").insert({model_id:model.id,kind,prompt:body.prompt||"Профиль AI-модели",style:body.style||"photorealistic",count,status:"queued",created_by:user.id}).select("*").single();
   if(error)return NextResponse.json({error:"Очередь генераций не настроена"},{status:503});
+  // Recorded at job creation, not on Modal success -- the GPU/API spend is
+  // committed the moment the job is queued (Modal bills the run whether or
+  // not it ultimately fails), which is exactly the retry-cost blind spot
+  // budget_limits/is_over_budget above exists to close.
+  const estimatedCost=kind==="avatar"?GENERATION_COST_USD.avatar*count:GENERATION_COST_USD[kind];
+  const {error:ledgerError}=await supabase.from("cost_ledger").insert({model_id:model.id,category:"modal_image",provider:"modal",estimated_cost_usd:estimatedCost,request_ref:job.id,created_by:user.id});
+  if(ledgerError)console.error("Cost ledger insert failed",ledgerError);
   if(process.env.MODAL_AVATAR_URL){try{const response=await fetch(process.env.MODAL_AVATAR_URL,{method:"POST",headers:{"content-type":"application/json","x-atlas-secret":process.env.ATLAS_WORKER_SECRET||""},body:JSON.stringify({job_id:job.id,model,request:{kind,prompt:optimizedPrompt,style:body.style,framing,count,seed,identity_blueprint:blueprint,reference_url:model.visual_passport?.avatar||null,source_url:body.source_url||null,base_photo_url:body.base_photo_url||null}})});if(!response.ok)throw new Error(`Modal ${response.status}`)}catch(error){await supabase.from("generation_jobs").update({status:"failed",error:error instanceof Error?error.message:"Облачный генератор недоступен"}).eq("id",job.id)}}
   return NextResponse.json({job,worker_connected:Boolean(process.env.MODAL_AVATAR_URL)});
 }
