@@ -74,6 +74,20 @@ const menu = [
   "Настройки",
   "Фан-чат",
 ];
+// Small line-icon set for the sidebar nav, one per menu entry above (same
+// order/index). Plain inline SVG rather than an icon package -- keeps the
+// bundle dependency-free and every icon inherits color via currentColor, so
+// the CSS-only .app nav button.active rule can tint it without touching
+// this array.
+const NAV_ICONS = [
+  <svg key="home" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M3 10.5 10 4l7 6.5" /><path d="M5 9v6.5a1 1 0 0 0 1 1h3v-4.5h2V16.5h3a1 1 0 0 0 1-1V9" /></svg>,
+  <svg key="models" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><circle cx="10" cy="7" r="3" /><path d="M4 16.5c0-3 2.7-5 6-5s6 2 6 5" /></svg>,
+  <svg key="studio" viewBox="0 0 20 20" fill="currentColor" stroke="none"><path d="M10 3.2 11.4 8 16.2 9.4 11.4 10.8 10 15.6 8.6 10.8 3.8 9.4 8.6 8z" /></svg>,
+  <svg key="calendar" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><rect x="3.3" y="4.5" width="13.4" height="12" rx="2.2" /><path d="M3.3 8.3h13.4M7 3v3M13 3v3" /></svg>,
+  <svg key="team" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><circle cx="7.3" cy="7" r="2.6" /><circle cx="14" cy="8.2" r="2" /><path d="M2.5 16.2c0-2.6 2.1-4.3 4.8-4.3s4.8 1.7 4.8 4.3" /><path d="M12.4 12.1c1.9.3 3.1 1.7 3.1 4" /></svg>,
+  <svg key="settings" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><circle cx="10" cy="10" r="2.6" /><path d="M10 3.3v2.1M10 14.6v2.1M16.7 10h-2.1M5.4 10H3.3M14.7 5.3l-1.5 1.5M6.8 13.2l-1.5 1.5M14.7 14.7l-1.5-1.5M6.8 6.8 5.3 5.3" /></svg>,
+  <svg key="mail" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="5" width="14" height="10" rx="2" /><path d="M3.6 6.2 10 11l6.4-4.8" /></svg>,
+];
 export default function Dashboard({ user }: { user: User }) {
   const s = useMemo(() => createClient(), []),
     [page, setPage] = useState("Главная"),
@@ -224,7 +238,8 @@ export default function Dashboard({ user }: { user: User }) {
                 setViewModelId(null);
               }}
             >
-              {["▦", "♙", "✦", "▦", "♙", "⚙", "✉"][i]} {n}
+              {NAV_ICONS[i]}
+              {n}
             </button>
           ))}
         </nav>

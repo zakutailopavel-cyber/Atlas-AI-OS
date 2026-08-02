@@ -26,7 +26,7 @@
 .character-section summary::before{content:"▸ ";color:var(--accent)}
 .character-section[open] summary::before{content:"▾ "}
 .character-section .form{margin-top:14px}
-.character-save-bar{display:flex;justify-content:flex-end;margin:-4px 0 16px}
+.character-save-bar{display:flex;justify-content:flex-end;align-items:center;margin:4px 0 16px;padding:12px 16px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius)}
 .character-save-bar button{border:0;background:linear-gradient(135deg,var(--accent),var(--accent-2));color:var(--accent-ink);border-radius:10px;padding:11px 17px;font-weight:700}
 .character-accounts>b,.character-posts>b{display:block;font-size:13px;margin-bottom:12px;color:var(--text)}
 .post-strip{display:flex;gap:9px;overflow-x:auto;padding-bottom:6px;margin-bottom:16px}
