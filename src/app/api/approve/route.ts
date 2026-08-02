@@ -29,6 +29,20 @@ export async function POST(request: Request) {
       { status: 400 },
     );
 
+  // Mandatory AI-disclosure gate. The UI (dashboard.tsx) only soft-warns
+  // on an empty disclosure field before saving a draft, so this route --
+  // the sole path to status "ready" -- is the actual enforcement point.
+  // Without this, a post with an empty disclosure could still reach
+  // "ready" and get published un-labeled as AI content.
+  if (!body.disclosure || !String(body.disclosure).trim())
+    return NextResponse.json(
+      {
+        error:
+          "Нельзя согласовать публикацию без AI-disclosure. Заполни поле disclosure перед согласованием.",
+      },
+      { status: 400 },
+    );
+
   // Persist whatever the reviewer had open in the dialog first, so the
   // hash we compute below matches exactly what's being approved — not a
   // stale DB row from before the reviewer's last edit.
