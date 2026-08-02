@@ -162,6 +162,137 @@ class SceneGenerator:
         except Exception as error:
             db.table("generation_jobs").update({"status":"failed","error":str(error)[:500],"completed_at":datetime.now(timezone.utc).isoformat()}).eq("id", job_id).execute(); raise
 
+# --- Face-swap prototype (2026-08-02) --------------------------------------
+# Spike for matching the quality bar of tools like Higgsfield: instead of
+# generating a whole scene from a text prompt (SceneGenerator above, which
+# struggles with crowds/complex backgrounds and hand anatomy), this takes an
+# EXISTING real photo and re-renders only the face region with the model's
+# identity, leaving lighting, shadows, background and everyone else in frame
+# untouched. This is a PROTOTYPE ONLY: not wired into /api/avatar or
+# generation_jobs yet, no UI trigger. Test it directly after `modal deploy`
+# with:
+#   modal run modal/atlas_avatar.py::test_faceswap \
+#     --base-photo-url "<free-license test photo>" \
+#     --identity-url "<model's canonical avatar URL>" \
+#     --prompt "<short scene/mood description>"
+#
+# Base test photos must come from a free-license source (Unsplash/Pexels)
+# and are for internal QA only. Publishing AI-edited real stock photos of
+# identifiable bystanders in commercial content is a separate, unresolved
+# licensing question -- do not wire this into production without deciding
+# that first (see chat 2026-08-02).
+#
+# Uses IP-Adapter FaceID-Plus-v2 (stronger identity lock than the plain
+# IP-Adapter-plus-face used by SceneGenerator) restricted to a masked face
+# region via SDXL inpainting, so the rest of the photo is left alone.
+
+def download_faceid_models():
+    from transformers import CLIPVisionModelWithProjection
+    from diffusers import AutoPipelineForInpainting
+    from insightface.app import FaceAnalysis
+    encoder = CLIPVisionModelWithProjection.from_pretrained("h94/IP-Adapter", subfolder="models/image_encoder")
+    pipe = AutoPipelineForInpainting.from_pretrained("stabilityai/stable-diffusion-xl-base-1.0", image_encoder=encoder)
+    pipe.load_ip_adapter("h94/IP-Adapter-FaceID", subfolder=None, weight_name="ip-adapter-faceid-plusv2_sdxl.bin", image_encoder_folder=None)
+    # Pre-downloads insightface's buffalo_l detection/recognition pack so the
+    # container doesn't fetch it from GitHub releases on every cold start.
+    FaceAnalysis(name="buffalo_l", root="/root/.insightface").prepare(ctx_id=-1, det_size=(640, 640))
+
+faceswap_image = (modal.Image.debian_slim(python_version="3.11")
+    .apt_install("libgl1", "libglib2.0-0")
+    .pip_install("torch", "diffusers", "transformers", "accelerate", "safetensors",
+                 "supabase", "pillow", "fastapi", "requests",
+                 "insightface==0.7.3", "onnxruntime-gpu", "opencv-python-headless")
+    .run_function(download_faceid_models))
+
+
+def build_face_mask(size, bbox, expand=1.7, feather=28):
+    # Elliptical mask around the detected face box, expanded to cover
+    # hairline/jaw/ears and feathered so the inpaint blends instead of
+    # leaving a hard seam. Everything outside stays the original pixels.
+    from PIL import Image, ImageDraw, ImageFilter
+    x1, y1, x2, y2 = bbox
+    w, h = x2 - x1, y2 - y1
+    cx, cy = (x1 + x2) / 2, (y1 + y2) / 2
+    half_w, half_h = (w * expand) / 2, (h * expand * 1.35) / 2
+    mask = Image.new("L", size, 0)
+    ImageDraw.Draw(mask).ellipse([cx - half_w, cy - half_h, cx + half_w, cy + half_h], fill=255)
+    return mask.filter(ImageFilter.GaussianBlur(feather))
+
+
+@app.cls(image=faceswap_image, gpu="A10G", scaledown_window=60, timeout=900,
+         secrets=[modal.Secret.from_name("atlas-supabase"), modal.Secret.from_name("atlas-worker")])
+class FaceSwapGenerator:
+    @modal.enter()
+    def load(self):
+        import torch
+        from diffusers import AutoPipelineForInpainting
+        from transformers import CLIPVisionModelWithProjection
+        from insightface.app import FaceAnalysis
+        encoder = CLIPVisionModelWithProjection.from_pretrained(
+            "h94/IP-Adapter", subfolder="models/image_encoder", torch_dtype=torch.float16)
+        self.pipe = AutoPipelineForInpainting.from_pretrained(
+            "stabilityai/stable-diffusion-xl-base-1.0", image_encoder=encoder,
+            torch_dtype=torch.float16, variant="fp16").to("cuda")
+        self.pipe.load_ip_adapter(
+            "h94/IP-Adapter-FaceID", subfolder=None,
+            weight_name="ip-adapter-faceid-plusv2_sdxl.bin", image_encoder_folder=None)
+        self.pipe.set_ip_adapter_scale(0.8)
+        self.face_app = FaceAnalysis(name="buffalo_l", root="/root/.insightface",
+                                      providers=["CUDAExecutionProvider", "CPUExecutionProvider"])
+        self.face_app.prepare(ctx_id=0, det_size=(640, 640))
+
+    def _largest_face(self, pil_image):
+        import numpy as np, cv2
+        cv_image = cv2.cvtColor(np.array(pil_image), cv2.COLOR_RGB2BGR)
+        faces = self.face_app.get(cv_image)
+        if not faces:
+            raise RuntimeError("No face detected in supplied photo")
+        return cv_image, max(faces, key=lambda f: (f.bbox[2] - f.bbox[0]) * (f.bbox[3] - f.bbox[1]))
+
+    def _identity_embeds(self, identity_image):
+        import torch
+        from PIL import Image
+        import cv2
+        from insightface.utils import face_align
+        cv_image, face = self._largest_face(identity_image)
+        embed = torch.from_numpy(face.normed_embedding).unsqueeze(0).unsqueeze(0)
+        crop = face_align.norm_crop(cv_image, landmark=face.kps, image_size=224)
+        crop_rgb = Image.fromarray(cv2.cvtColor(crop, cv2.COLOR_BGR2RGB))
+        return embed, crop_rgb
+
+    @modal.method()
+    def swap(self, base_photo_url: str, identity_reference_url: str, prompt: str = "") -> bytes:
+        import io, requests
+        from PIL import Image
+        base = Image.open(requests.get(base_photo_url, timeout=30, stream=True).raw).convert("RGB")
+        identity = Image.open(requests.get(identity_reference_url, timeout=30, stream=True).raw).convert("RGB")
+        faceid_embeds, face_crop = self._identity_embeds(identity)
+        _, base_face = self._largest_face(base)
+        mask = build_face_mask(base.size, [float(v) for v in base_face.bbox])
+        full_prompt = (f"one adult woman, photorealistic face, same identity as reference photo, "
+                        f"natural skin texture with visible pores, lighting matching the rest of the scene, "
+                        f"{prompt}, correct anatomy, no text, no watermark")
+        negative = ("plastic skin, illustration, extra face, distorted face, mismatched lighting, "
+                    "seam, text, watermark, low quality, blurry, deformed, cartoon")
+        result = self.pipe(
+            prompt=full_prompt, negative_prompt=negative,
+            image=base, mask_image=mask,
+            ip_adapter_image=face_crop, ip_adapter_image_embeds=[faceid_embeds],
+            strength=0.65, num_inference_steps=30, guidance_scale=5.0,
+        ).images[0]
+        buffer = io.BytesIO()
+        result.save(buffer, format="JPEG", quality=93)
+        return buffer.getvalue()
+
+
+@app.local_entrypoint()
+def test_faceswap(base_photo_url: str, identity_url: str, prompt: str = "", out: str = "faceswap_test.jpg"):
+    data = FaceSwapGenerator().swap.remote(base_photo_url, identity_url, prompt)
+    with open(out, "wb") as f:
+        f.write(data)
+    print(f"Saved {out} ({len(data)} bytes)")
+
+
 @app.function(image=image, secrets=[modal.Secret.from_name("atlas-worker")])
 @modal.fastapi_endpoint(method="POST")
 async def submit(request: Request):
