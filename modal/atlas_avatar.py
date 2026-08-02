@@ -205,17 +205,24 @@ faceswap_image = (modal.Image.debian_slim(python_version="3.11")
     .run_function(download_faceid_models))
 
 
-def build_face_mask(size, bbox, expand=1.7, feather=28):
-    # Elliptical mask around the detected face box, expanded to cover
-    # hairline/jaw/ears and feathered so the inpaint blends instead of
-    # leaving a hard seam. Everything outside stays the original pixels.
+def build_face_mask(size, bbox, top_margin=0.22, bottom_margin=0.38, side_margin=0.16, feather=20):
+    # Ellipse inscribed in the detected face bbox plus modest, ASYMMETRIC
+    # padding -- more room below (chin/neck, for a clean blend) than above
+    # (deliberately little, so the mask doesn't eat into the hairline) and
+    # only a little to the sides (so it doesn't reach shoulders/collar/
+    # clothing straps). The first version used a large symmetric expand
+    # around the bbox center (1.7x width, ~2.3x height) which bled upward
+    # into hair and sideways into clothing, producing a fused "hood"
+    # artifact where the model blended a stray strap into the hairline.
     from PIL import Image, ImageDraw, ImageFilter
     x1, y1, x2, y2 = bbox
     w, h = x2 - x1, y2 - y1
-    cx, cy = (x1 + x2) / 2, (y1 + y2) / 2
-    half_w, half_h = (w * expand) / 2, (h * expand * 1.35) / 2
+    left = x1 - w * side_margin
+    right = x2 + w * side_margin
+    top = y1 - h * top_margin
+    bottom = y2 + h * bottom_margin
     mask = Image.new("L", size, 0)
-    ImageDraw.Draw(mask).ellipse([cx - half_w, cy - half_h, cx + half_w, cy + half_h], fill=255)
+    ImageDraw.Draw(mask).ellipse([left, top, right, bottom], fill=255)
     return mask.filter(ImageFilter.GaussianBlur(feather))
 
 
