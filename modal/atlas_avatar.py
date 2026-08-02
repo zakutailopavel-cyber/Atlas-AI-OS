@@ -249,16 +249,31 @@ class FaceSwapGenerator:
             raise RuntimeError("No face detected in supplied photo")
         return cv_image, max(faces, key=lambda f: (f.bbox[2] - f.bbox[0]) * (f.bbox[3] - f.bbox[1]))
 
-    def _identity_embeds(self, identity_image):
-        import torch
+    def _identity_crop(self, identity_image):
+        # FaceID-Plus needs two separate things from the reference photo:
+        # the insightface identity embedding (below) and this aligned CLIP
+        # crop, which diffusers' IPAdapterFaceIDPlusImageProjection combines
+        # internally -- it cannot be passed the normal way via
+        # ip_adapter_image, that raises "Cannot leave both ip_adapter_image
+        # and ip_adapter_image_embeds defined" from check_inputs().
         from PIL import Image
         import cv2
         from insightface.utils import face_align
         cv_image, face = self._largest_face(identity_image)
-        embed = torch.from_numpy(face.normed_embedding).unsqueeze(0).unsqueeze(0)
         crop = face_align.norm_crop(cv_image, landmark=face.kps, image_size=224)
-        crop_rgb = Image.fromarray(cv2.cvtColor(crop, cv2.COLOR_BGR2RGB))
-        return embed, crop_rgb
+        return face, Image.fromarray(cv2.cvtColor(crop, cv2.COLOR_BGR2RGB))
+
+    def _faceid_embeds(self, face, device):
+        # Reproduces the diffusers IP-Adapter FaceID-Plus-v2 recipe: stack
+        # the raw insightface identity embedding with a zeroed negative
+        # counterpart (classifier-free guidance expects both halves
+        # concatenated on dim 0, split back out by chunk(2) inside
+        # prepare_ip_adapter_image_embeds).
+        import torch
+        embed = torch.from_numpy(face.normed_embedding).unsqueeze(0)
+        ref = torch.stack([embed], dim=0).unsqueeze(0)
+        neg = torch.zeros_like(ref)
+        return torch.cat([neg, ref]).to(device=device, dtype=torch.float16)
 
     @modal.method()
     def swap(self, base_photo_url: str, identity_reference_url: str, prompt: str = "") -> bytes:
@@ -266,7 +281,18 @@ class FaceSwapGenerator:
         from PIL import Image
         base = Image.open(requests.get(base_photo_url, timeout=30, stream=True).raw).convert("RGB")
         identity = Image.open(requests.get(identity_reference_url, timeout=30, stream=True).raw).convert("RGB")
-        faceid_embeds, face_crop = self._identity_embeds(identity)
+        device = "cuda"
+        face, face_crop = self._identity_crop(identity)
+        id_embeds = self._faceid_embeds(face, device)
+        # The CLIP ("plus") half is injected by setting an attribute on the
+        # projection layer directly, then only id_embeds goes through the
+        # normal pipe() argument -- see IPAdapterFaceIDPlusImageProjection
+        # .forward() in diffusers/models/embeddings.py.
+        clip_embeds = self.pipe.prepare_ip_adapter_image_embeds(
+            [face_crop], None, device, 1, True)[0]
+        proj_layer = self.pipe.unet.encoder_hid_proj.image_projection_layers[0]
+        proj_layer.clip_embeds = clip_embeds
+        proj_layer.shortcut = True  # plusv2 variant uses the residual shortcut
         _, base_face = self._largest_face(base)
         mask = build_face_mask(base.size, [float(v) for v in base_face.bbox])
         full_prompt = (f"one adult woman, photorealistic face, same identity as reference photo, "
@@ -277,7 +303,7 @@ class FaceSwapGenerator:
         result = self.pipe(
             prompt=full_prompt, negative_prompt=negative,
             image=base, mask_image=mask,
-            ip_adapter_image=face_crop, ip_adapter_image_embeds=[faceid_embeds],
+            ip_adapter_image_embeds=[id_embeds],
             strength=0.65, num_inference_steps=30, guidance_scale=5.0,
         ).images[0]
         buffer = io.BytesIO()
