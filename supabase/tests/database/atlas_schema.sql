@@ -2,7 +2,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 
-select plan(37);
+select plan(38);
 
 select has_table('public', 'profiles', 'profiles exists');
 select has_table('public', 'ai_models', 'ai_models exists');
@@ -27,9 +27,10 @@ select is(
     '202607211500',
     '202607311300',
     '202608011400',
-    '202608021500'
+    '202608021500',
+    '202608021600'
   ]::text[],
-  'the complete 0600 -> 0700 -> 0800 -> 0900 -> 1000 -> 1200 -> 1800 -> 2300 -> 1500 -> 311300 -> 011400 -> 021500 chain is recorded'
+  'the complete 0600 -> 0700 -> 0800 -> 0900 -> 1000 -> 1200 -> 1800 -> 2300 -> 1500 -> 311300 -> 011400 -> 021500 -> 021600 chain is recorded'
 );
 
 select set_eq(
@@ -208,6 +209,7 @@ select set_eq(
       ('public.model_references:team updates own model references'),
       ('storage.objects:authenticated reads atlas assets'),
       ('storage.objects:service uploads atlas assets'),
+      ('storage.objects:authenticated uploads faceswap base photos'),
       ('public.workspaces:workspace members can view workspaces'),
       ('public.workspaces:workspace creators can view own workspaces'),
       ('public.workspaces:authenticated users can create own workspace'),
