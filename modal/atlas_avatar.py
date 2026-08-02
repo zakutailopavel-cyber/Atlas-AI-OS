@@ -328,7 +328,7 @@ class FaceSwapGenerator:
             # model's locked canonical face (set server-side in
             # /api/avatar, not user-controlled). base_photo_url is the
             # photo the user manually uploaded in AvatarStudio.
-            data = self.swap(request["base_photo_url"], request["reference_url"], request.get("prompt", ""))
+            data = self.swap.local(request["base_photo_url"], request["reference_url"], request.get("prompt", ""))
             picture = Image.open(io.BytesIO(data)).convert("RGB")
             save_results(db, payload, [picture])
         except Exception as error:
