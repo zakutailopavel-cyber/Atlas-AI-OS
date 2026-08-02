@@ -4,6 +4,11 @@ import { createClient } from "@/utils/supabase/server";
 
 export const runtime = "nodejs";
 
+// Approximate cost estimate for gpt-5.4-mini text generation, USD per 1K
+// tokens. Same governor estimate used in /api/fan-reply -- update if
+// OpenAI pricing changes.
+const COST_PER_1K_TOKENS_USD = 0.002;
+
 const schema = {
   type: "object",
   additionalProperties: false,
@@ -73,6 +78,25 @@ export async function POST(request: Request) {
       { error: "Не указана тема или модель" },
       { status: 400 },
     );
+
+  // Budget check happens before any paid call. Mirrors /api/fan-reply: an
+  // RPC error logs and continues, a real budget breach always blocks.
+  const { data: overBudget, error: budgetError } = await supabase.rpc(
+    "is_over_budget",
+    { target_model_id: body.model.id },
+  );
+  if (budgetError) {
+    console.error("Budget check failed", budgetError);
+  } else if (overBudget) {
+    return NextResponse.json(
+      {
+        error:
+          "Достигнут установленный бюджетный лимит для этой модели. Повысь лимит в budget_limits, чтобы продолжить генерацию.",
+      },
+      { status: 402 },
+    );
+  }
+
   try {
     const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
     const response = await client.responses.create({
@@ -93,6 +117,22 @@ export async function POST(request: Request) {
       },
     });
     if (!response.output_text) throw new Error("Модель не вернула результат");
+
+    // response.usage is provided by the OpenAI SDK's Responses API; same
+    // field used in /api/fan-reply.
+    const totalTokens = response.usage?.total_tokens ?? 0;
+    const estimatedCost = (totalTokens / 1000) * COST_PER_1K_TOKENS_USD;
+
+    const { error: ledgerError } = await supabase.from("cost_ledger").insert({
+      model_id: body.model.id,
+      category: "openai_chat",
+      provider: "openai",
+      estimated_cost_usd: estimatedCost,
+      request_ref: response.id ?? null,
+      created_by: user.id,
+    });
+    if (ledgerError) console.error("Cost ledger insert failed", ledgerError);
+
     return NextResponse.json(JSON.parse(response.output_text));
   } catch (error) {
     console.error("Atlas generation failed", error);
