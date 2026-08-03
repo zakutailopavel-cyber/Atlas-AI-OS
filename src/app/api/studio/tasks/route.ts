@@ -25,6 +25,37 @@ function errorResponse(error: unknown) {
   return Response.json({ error: code }, { status });
 }
 
+async function notifyRework(input: { taskId: string; modelId: string; notes: string }) {
+  const webhook = process.env.N8N_REWORK_WEBHOOK_URL;
+  if (!webhook) return { delivered: false, reason: "not_configured" };
+  const secret = process.env.N8N_REWORK_WEBHOOK_SECRET || "";
+  try {
+    const response = await fetch(webhook, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        ...(secret ? { "x-atlas-webhook-secret": secret } : {}),
+      },
+      body: JSON.stringify({
+        event: "atlas.task.changes_requested",
+        taskId: input.taskId,
+        modelId: input.modelId,
+        notes: input.notes,
+        requestedAt: new Date().toISOString(),
+      }),
+      signal: AbortSignal.timeout(8000),
+    });
+    return response.ok
+      ? { delivered: true }
+      : { delivered: false, reason: `http_${response.status}` };
+  } catch (error) {
+    return {
+      delivered: false,
+      reason: error instanceof Error ? error.message : "webhook_error",
+    };
+  }
+}
+
 export async function GET() {
   try {
     await currentUser();
@@ -130,8 +161,22 @@ export async function PATCH(request: Request) {
         .select("*")
         .single();
       if (error) throw error;
-      await admin.from("agent_audit_log").insert({ actor_id: user.id, action: "studio.task.request_changes", resource_type: "agent_image_task", resource_id: id, model_id: existing.model_id, metadata: { notes } });
-      return Response.json({ task: data });
+
+      const webhook = await notifyRework({
+        taskId: id,
+        modelId: existing.model_id,
+        notes,
+      });
+
+      await admin.from("agent_audit_log").insert({
+        actor_id: user.id,
+        action: "studio.task.request_changes",
+        resource_type: "agent_image_task",
+        resource_id: id,
+        model_id: existing.model_id,
+        metadata: { notes, webhook },
+      });
+      return Response.json({ task: data, webhook });
     }
 
     throw new Error("INVALID_STATUS");
