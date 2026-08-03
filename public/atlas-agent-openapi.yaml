@@ -1,0 +1,200 @@
+openapi: 3.1.0
+info:
+  title: Atlas Agent API
+  version: 1.0.0
+  description: Scoped API for a custom GPT or Claude agent to read Atlas image tasks, retrieve references, return generated images and update the content pipeline.
+servers:
+  - url: https://atlas.epkoolitus.ee
+security:
+  - bearerAuth: []
+paths:
+  /api/agent/status:
+    get:
+      operationId: getAtlasStatus
+      summary: Read Atlas queue and content status
+      responses:
+        '200':
+          description: Atlas status
+  /api/agent/models:
+    get:
+      operationId: listAtlasModels
+      summary: List allowed AI models
+      responses:
+        '200':
+          description: Models
+  /api/agent/tasks:
+    get:
+      operationId: listImageTasks
+      summary: List image tasks or fetch the next queued task
+      parameters:
+        - in: query
+          name: status
+          schema:
+            type: string
+            enum: [queued, claimed, completed, failed, cancelled]
+        - in: query
+          name: next
+          schema:
+            type: boolean
+      responses:
+        '200':
+          description: Image tasks
+    post:
+      operationId: createImageTask
+      summary: Create an image task in Atlas
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateTask'
+      responses:
+        '201':
+          description: Created task
+  /api/agent/tasks/{id}:
+    get:
+      operationId: getImageTask
+      summary: Get one task with model profile, references and optional content item
+      parameters:
+        - $ref: '#/components/parameters/TaskId'
+      responses:
+        '200':
+          description: Complete task context
+    patch:
+      operationId: updateImageTask
+      summary: Claim, complete or fail an image task
+      parameters:
+        - $ref: '#/components/parameters/TaskId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              oneOf:
+                - $ref: '#/components/schemas/ClaimTask'
+                - $ref: '#/components/schemas/CompleteTask'
+                - $ref: '#/components/schemas/FailTask'
+      responses:
+        '200':
+          description: Updated task
+  /api/agent/assets/import:
+    post:
+      operationId: importGeneratedImage
+      summary: Import a generated image from an approved HTTPS host into Atlas Storage
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [task_id, model_id, source_url]
+              properties:
+                task_id:
+                  type: string
+                  format: uuid
+                model_id:
+                  type: string
+                  format: uuid
+                source_url:
+                  type: string
+                  format: uri
+      responses:
+        '200':
+          description: Imported asset path and public URL
+  /api/agent/assets/upload-url:
+    post:
+      operationId: createResultUploadUrl
+      summary: Create a signed Supabase upload URL for a generated image
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [task_id, model_id]
+              properties:
+                task_id:
+                  type: string
+                  format: uuid
+                model_id:
+                  type: string
+                  format: uuid
+                extension:
+                  type: string
+                  enum: [png, jpg, jpeg, webp]
+      responses:
+        '200':
+          description: Signed upload URL, token and storage path
+  /api/agent/content:
+    get:
+      operationId: listAtlasContent
+      summary: List content items for allowed models
+      responses:
+        '200':
+          description: Content items
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+  parameters:
+    TaskId:
+      in: path
+      name: id
+      required: true
+      schema:
+        type: string
+        format: uuid
+  schemas:
+    CreateTask:
+      type: object
+      required: [model_id, title, instructions]
+      properties:
+        model_id:
+          type: string
+          format: uuid
+        content_item_id:
+          type: [string, 'null']
+          format: uuid
+        title:
+          type: string
+        instructions:
+          type: string
+        reference_ids:
+          type: array
+          maxItems: 20
+          items:
+            type: string
+            format: uuid
+    ClaimTask:
+      type: object
+      required: [action]
+      properties:
+        action:
+          const: claim
+        agent_name:
+          type: string
+    CompleteTask:
+      type: object
+      required: [action]
+      properties:
+        action:
+          const: complete
+        result_url:
+          type: [string, 'null']
+          format: uri
+        result_storage_path:
+          type: [string, 'null']
+        result_notes:
+          type: [string, 'null']
+      anyOf:
+        - required: [result_url]
+        - required: [result_storage_path]
+    FailTask:
+      type: object
+      required: [action, reason]
+      properties:
+        action:
+          const: fail
+        reason:
+          type: string
