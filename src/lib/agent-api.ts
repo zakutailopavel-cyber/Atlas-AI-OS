@@ -1,7 +1,7 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { timingSafeEqual } from "node:crypto";
 
-export type AgentScope = "read" | "content:write" | "model:write" | "reference:write" | "generate";
+export type AgentScope = "read" | "content:write" | "model:write" | "reference:write" | "generate" | "task:write" | "asset:write";
 
 export type AgentContext = {
   supabase: SupabaseClient;
@@ -44,7 +44,7 @@ export function authorizeAgent(request: Request, required: AgentScope): AgentCon
 
 export function agentError(error: unknown) {
   const code = error instanceof Error ? error.message : "AGENT_ERROR";
-  const status = code === "AGENT_UNAUTHORIZED" ? 401 : code === "AGENT_FORBIDDEN" ? 403 : code === "AGENT_NOT_CONFIGURED" || code === "AGENT_MODEL_ALLOWLIST_EMPTY" ? 503 : 500;
+  const status = code === "AGENT_UNAUTHORIZED" ? 401 : code === "AGENT_FORBIDDEN" || code === "MODEL_NOT_ALLOWED" ? 403 : code === "AGENT_NOT_CONFIGURED" || code === "AGENT_MODEL_ALLOWLIST_EMPTY" ? 503 : code.endsWith("_NOT_FOUND") ? 404 : 500;
   return Response.json({ error: code }, { status });
 }
 
