@@ -1,0 +1,83 @@
+name: Vercel production deploy
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: vercel-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy Atlas to Vercel production
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: production
+    env:
+      VERCEL_DEPLOY_HOOK_URL: ${{ secrets.VERCEL_DEPLOY_HOOK_URL }}
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Validate deployment configuration
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -n "${VERCEL_DEPLOY_HOOK_URL:-}" ]; then
+            echo "Deployment mode: Vercel deploy hook"
+            exit 0
+          fi
+
+          missing=0
+          for name in VERCEL_TOKEN VERCEL_ORG_ID VERCEL_PROJECT_ID; do
+            if [ -z "${!name:-}" ]; then
+              echo "::error::$name is not configured in GitHub Actions secrets"
+              missing=1
+            fi
+          done
+
+          if [ "$missing" -ne 0 ]; then
+            echo "::error::Configure VERCEL_DEPLOY_HOOK_URL, or configure VERCEL_TOKEN + VERCEL_ORG_ID + VERCEL_PROJECT_ID."
+            exit 1
+          fi
+
+          echo "Deployment mode: Vercel CLI"
+
+      - name: Trigger production deployment hook
+        if: ${{ env.VERCEL_DEPLOY_HOOK_URL != '' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          response="$(curl --fail-with-body --silent --show-error --request POST "$VERCEL_DEPLOY_HOOK_URL")"
+          echo "$response"
+
+      - name: Set up Node.js
+        if: ${{ env.VERCEL_DEPLOY_HOOK_URL == '' }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Pull Vercel production configuration
+        if: ${{ env.VERCEL_DEPLOY_HOOK_URL == '' }}
+        shell: bash
+        run: npx --yes vercel@latest pull --yes --environment=production --token="$VERCEL_TOKEN"
+
+      - name: Build production deployment
+        if: ${{ env.VERCEL_DEPLOY_HOOK_URL == '' }}
+        shell: bash
+        run: npx --yes vercel@latest build --prod --token="$VERCEL_TOKEN"
+
+      - name: Deploy prebuilt output to production
+        if: ${{ env.VERCEL_DEPLOY_HOOK_URL == '' }}
+        shell: bash
+        run: npx --yes vercel@latest deploy --prebuilt --prod --token="$VERCEL_TOKEN"
