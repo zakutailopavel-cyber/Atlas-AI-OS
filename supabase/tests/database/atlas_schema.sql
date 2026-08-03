@@ -27,9 +27,10 @@ select is(
     '202607211500',
     '202607311300',
     '202608011400',
-    '202608021500'
+    '202608021500',
+    '202608021600'
   ]::text[],
-  'the complete 0600 -> 0700 -> 0800 -> 0900 -> 1000 -> 1200 -> 1800 -> 2300 -> 1500 -> 311300 -> 011400 -> 021500 chain is recorded'
+  'the complete 0600 -> 0700 -> 0800 -> 0900 -> 1000 -> 1200 -> 1800 -> 2300 -> 1500 -> 311300 -> 011400 -> 021500 -> 021600 chain is recorded'
 );
 
 select set_eq(
@@ -208,6 +209,7 @@ select set_eq(
       ('public.model_references:team updates own model references'),
       ('storage.objects:authenticated reads atlas assets'),
       ('storage.objects:service uploads atlas assets'),
+      ('storage.objects:authenticated uploads faceswap base photos'),
       ('public.workspaces:workspace members can view workspaces'),
       ('public.workspaces:workspace creators can view own workspaces'),
       ('public.workspaces:authenticated users can create own workspace'),
@@ -219,12 +221,7 @@ select set_eq(
   'legacy Atlas policy names match the migration chain'
 );
 
-select has_column(
-  'public',
-  'generation_jobs',
-  'kind',
-  'generation_jobs.kind exists'
-);
+select has_column('public', 'generation_jobs', 'kind', 'generation_jobs.kind exists');
 
 select is(
   (
@@ -267,19 +264,8 @@ select is(
     select count(*)::integer
     from information_schema.columns
     where table_schema = 'public'
-      and table_name in (
-        'profiles',
-        'ai_models',
-        'content_items',
-        'generation_jobs',
-        'model_references',
-        'workspaces',
-        'workspace_members'
-      )
-      and column_name in (
-        'workspace',
-        'workspace_id'
-      )
+      and table_name in ('profiles','ai_models','content_items','generation_jobs','model_references','workspaces','workspace_members')
+      and column_name in ('workspace','workspace_id')
   ),
   0,
   'future non-owner bridge columns are absent'
@@ -288,29 +274,8 @@ select is(
 select has_column('public', 'content_items', 'asset_url', 'content_items nullable asset_url bridge exists');
 select has_column('public', 'content_items', 'review_comment', 'content_items nullable review_comment bridge exists');
 
-select is(
-  (
-    select is_nullable
-    from information_schema.columns
-    where table_schema = 'public'
-      and table_name = 'content_items'
-      and column_name = 'asset_url'
-  ),
-  'YES',
-  'content_items.asset_url remains nullable, no default, no backfill'
-);
-
-select is(
-  (
-    select is_nullable
-    from information_schema.columns
-    where table_schema = 'public'
-      and table_name = 'content_items'
-      and column_name = 'review_comment'
-  ),
-  'YES',
-  'content_items.review_comment remains nullable, no default, no backfill'
-);
+select is((select is_nullable from information_schema.columns where table_schema='public' and table_name='content_items' and column_name='asset_url'),'YES','content_items.asset_url remains nullable, no default, no backfill');
+select is((select is_nullable from information_schema.columns where table_schema='public' and table_name='content_items' and column_name='review_comment'),'YES','content_items.review_comment remains nullable, no default, no backfill');
 
 select has_table('public', 'workspaces', 'workspaces exists');
 select has_table('public', 'workspace_members', 'workspace_members exists');
@@ -319,82 +284,16 @@ select has_column('public', 'ai_models', 'owner_id', 'ai_models nullable owner_i
 select has_column('public', 'generation_jobs', 'owner_id', 'generation_jobs nullable owner_id bridge exists');
 select has_column('public', 'model_references', 'owner_id', 'model_references nullable owner_id bridge exists');
 
-select is(
-  (
-    select is_nullable
-    from information_schema.columns
-    where table_schema = 'public'
-      and table_name = 'content_items'
-      and column_name = 'owner_id'
-  ),
-  'YES',
-  'content_items.owner_id remains nullable before backfill and cutover'
-);
-
-select is(
-  (
-    select is_nullable
-    from information_schema.columns
-    where table_schema = 'public'
-      and table_name = 'ai_models'
-      and column_name = 'owner_id'
-  ),
-  'YES',
-  'ai_models.owner_id remains nullable before backfill and cutover'
-);
-
-select is(
-  (
-    select is_nullable
-    from information_schema.columns
-    where table_schema = 'public'
-      and table_name = 'generation_jobs'
-      and column_name = 'owner_id'
-  ),
-  'YES',
-  'generation_jobs.owner_id remains nullable before backfill and cutover'
-);
-
-select is(
-  (
-    select is_nullable
-    from information_schema.columns
-    where table_schema = 'public'
-      and table_name = 'model_references'
-      and column_name = 'owner_id'
-  ),
-  'YES',
-  'model_references.owner_id remains nullable before backfill and cutover'
-);
+select is((select is_nullable from information_schema.columns where table_schema='public' and table_name='content_items' and column_name='owner_id'),'YES','content_items.owner_id remains nullable before backfill and cutover');
+select is((select is_nullable from information_schema.columns where table_schema='public' and table_name='ai_models' and column_name='owner_id'),'YES','ai_models.owner_id remains nullable before backfill and cutover');
+select is((select is_nullable from information_schema.columns where table_schema='public' and table_name='generation_jobs' and column_name='owner_id'),'YES','generation_jobs.owner_id remains nullable before backfill and cutover');
+select is((select is_nullable from information_schema.columns where table_schema='public' and table_name='model_references' and column_name='owner_id'),'YES','model_references.owner_id remains nullable before backfill and cutover');
 
 select has_function('public', 'is_workspace_member', array['uuid'], 'membership helper exists');
 select has_function('public', 'has_workspace_role', array['uuid', 'text[]'], 'role helper exists');
 
-select is(
-  (
-    select prosecdef
-    from pg_proc p
-    join pg_namespace n on n.oid = p.pronamespace
-    where n.nspname = 'public'
-      and p.proname = 'is_workspace_member'
-      and p.proargtypes = '2950'::oidvector
-  ),
-  true,
-  'is_workspace_member is security definer'
-);
-
-select is(
-  (
-    select prosecdef
-    from pg_proc p
-    join pg_namespace n on n.oid = p.pronamespace
-    where n.nspname = 'public'
-      and p.proname = 'has_workspace_role'
-      and p.proargtypes = '2950 1009'::oidvector
-  ),
-  true,
-  'has_workspace_role is security definer'
-);
+select is((select prosecdef from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public' and p.proname='is_workspace_member' and p.proargtypes='2950'::oidvector),true,'is_workspace_member is security definer');
+select is((select prosecdef from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public' and p.proname='has_workspace_role' and p.proargtypes='2950 1009'::oidvector),true,'has_workspace_role is security definer');
 
 select isnt_empty(
   $$
@@ -414,38 +313,18 @@ select is(
     from pg_policies
     where schemaname = 'public'
       and tablename = 'content_items'
-      and policyname in (
-        'team can view content',
-        'team can create content',
-        'team can update content'
-      )
+      and policyname in ('team can view content','team can create content','team can update content')
   ),
   3,
   'legacy broad content_items policies are still present for pre-cutover compatibility'
 );
-
--- The 'approval tables remain absent in tenant foundation PR' guard
--- that used to live here was specific to verifying the 202607170900
--- tenant-foundation migration in isolation. Content Pipeline v1
--- (202607202300) intentionally introduces public.content_approvals, so
--- that guard is obsolete now rather than violated; removed instead of
--- widening it into a wildcard exception.
 
 select is(
   (
     select count(*)::integer
     from pg_indexes
     where schemaname = 'public'
-      and indexname in (
-        'workspaces_status_idx',
-        'workspaces_created_by_idx',
-        'workspace_members_user_id_idx',
-        'workspace_members_active_owner_role_idx',
-        'content_items_owner_id_idx',
-        'ai_models_owner_id_idx',
-        'generation_jobs_owner_id_idx',
-        'model_references_owner_id_idx'
-      )
+      and indexname in ('workspaces_status_idx','workspaces_created_by_idx','workspace_members_user_id_idx','workspace_members_active_owner_role_idx','content_items_owner_id_idx','ai_models_owner_id_idx','generation_jobs_owner_id_idx','model_references_owner_id_idx')
   ),
   8,
   'tenant foundation and nullable owner bridge indexes exist'
