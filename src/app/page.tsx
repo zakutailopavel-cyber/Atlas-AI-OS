@@ -1,2 +1,5 @@
-import {redirect} from 'next/navigation';import {createClient} from '@/utils/supabase/server';import Dashboard from './dashboard';
-export default async function Home(){const s=await createClient(),{data:{user}}=await s.auth.getUser();if(!user)redirect('/login');const {data:profile}=await s.from('profiles').select('role').eq('id',user.id).single();return <Dashboard user={{id:user.id,email:user.email||'',role:profile?.role||'editor'}}/>}
+import { redirect } from "next/navigation";
+
+export default function Home() {
+  redirect("/studio");
+}
