@@ -11,6 +11,7 @@ import "./character.css";
 import "./library.css";
 import "./refinement.css";
 import "./fan-reply.css";
+import "./studio/studio.css";
 
 export const metadata: Metadata = {
   title: "Atlas AI OS",
