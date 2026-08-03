@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
+import { createClient as createServiceClient } from "@supabase/supabase-js";
 import { createClient } from "@/utils/supabase/server";
-import AtlasStudioClient from "./studio-client";
+import StudioV2Client from "./studio-v2-client";
 
 export default async function AtlasStudioPage() {
   const supabase = await createClient();
@@ -24,12 +25,28 @@ export default async function AtlasStudioPage() {
       supabase.from("social_accounts").select("*").order("created_at"),
     ]);
 
+  let tasks: unknown[] = [];
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (url && serviceKey) {
+    const admin = createServiceClient(url, serviceKey, {
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
+    const { data } = await admin
+      .from("agent_image_tasks")
+      .select("id,model_id,content_item_id,title,instructions,status,reference_ids,result_url,result_storage_path,result_notes,claimed_by,claimed_at,completed_at,created_at,updated_at")
+      .order("created_at", { ascending: false })
+      .limit(150);
+    tasks = data || [];
+  }
+
   return (
-    <AtlasStudioClient
+    <StudioV2Client
       models={modelsResult.data || []}
       references={referencesResult.data || []}
       items={itemsResult.data || []}
       accounts={accountsResult.data || []}
+      initialTasks={tasks as never[]}
     />
   );
 }
