@@ -1,0 +1,280 @@
+@media (max-width: 760px) {
+  .ops-shell {
+    grid-template-columns: 58px minmax(0, 1fr);
+  }
+
+  .ops-sidebar {
+    padding: 10px 6px;
+    border-right-color: #20263a;
+  }
+
+  .ops-logo {
+    padding: 2px 4px 12px;
+  }
+
+  .ops-logo span {
+    width: 34px;
+    height: 34px;
+    border-radius: 10px;
+  }
+
+  .ops-sidebar nav {
+    gap: 7px;
+  }
+
+  .ops-sidebar nav button {
+    min-height: 44px;
+    padding: 9px 4px;
+    border-radius: 10px;
+  }
+
+  .ops-sidebar nav button span {
+    font-size: 16px;
+  }
+
+  .ops-main {
+    padding: 14px 10px 32px;
+    overflow: hidden;
+  }
+
+  .ops-topbar {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 112px;
+    align-items: end;
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+
+  .ops-topbar small {
+    font-size: 8px;
+    line-height: 1.25;
+    letter-spacing: .08em;
+  }
+
+  .ops-topbar h1 {
+    margin-top: 2px;
+    font-size: 19px;
+  }
+
+  .ops-topbar select {
+    width: 112px;
+    min-width: 0;
+    max-width: none;
+    padding: 8px 9px;
+    font-size: 11px;
+    text-overflow: ellipsis;
+  }
+
+  .ops-kpis {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+    margin-bottom: 10px;
+  }
+
+  .ops-kpis article {
+    min-height: 86px;
+    padding: 12px;
+    gap: 4px;
+  }
+
+  .ops-kpis small {
+    font-size: 9px;
+    line-height: 1.3;
+  }
+
+  .ops-kpis strong {
+    font-size: 23px;
+  }
+
+  .ops-kpis span {
+    font-size: 9px;
+    line-height: 1.3;
+  }
+
+  .ops-grid.two,
+  .ops-identity-card,
+  .ops-create-grid,
+  .ops-moderation-layout {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 10px;
+  }
+
+  .ops-card,
+  .ops-identity-card {
+    padding: 12px;
+    border-radius: 10px;
+  }
+
+  .ops-card header {
+    align-items: flex-start;
+    gap: 8px;
+    margin-bottom: 10px;
+  }
+
+  .ops-card header h2 {
+    font-size: 15px;
+  }
+
+  .ops-card header > button,
+  .ops-card header > span {
+    white-space: nowrap;
+    padding: 6px 8px;
+  }
+
+  .ops-timeline article {
+    grid-template-columns: 8px minmax(0, 1fr) auto;
+    gap: 8px;
+    padding: 10px 0;
+  }
+
+  .ops-timeline b,
+  .ops-content-list b {
+    font-size: 11px;
+  }
+
+  .ops-timeline small,
+  .ops-content-list small {
+    font-size: 9px;
+  }
+
+  .ops-timeline em {
+    max-width: 74px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .ops-content-list article {
+    grid-template-columns: 38px minmax(0, 1fr) auto;
+    gap: 8px;
+  }
+
+  .ops-content-list article > span {
+    width: 38px;
+    height: 38px;
+  }
+
+  .ops-identity-card {
+    gap: 12px;
+  }
+
+  .ops-face {
+    min-height: 0;
+    aspect-ratio: 4 / 5;
+  }
+
+  .ops-title-row {
+    display: grid;
+    gap: 8px;
+  }
+
+  .ops-title-row h2 {
+    font-size: 22px;
+  }
+
+  .ops-lock {
+    width: fit-content;
+  }
+
+  .ops-meta {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+    margin-top: 14px;
+  }
+
+  .ops-reference-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 7px;
+  }
+
+  .ops-automation-fields {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+
+  .ops-automation-form footer {
+    align-items: stretch !important;
+    gap: 10px;
+  }
+
+  .ops-automation-form footer .ops-primary {
+    width: 100%;
+  }
+
+  .ops-reference-select {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .ops-primary-strip {
+    grid-template-columns: 54px minmax(0, 1fr);
+  }
+
+  .ops-primary-strip > div {
+    width: 54px;
+    height: 66px;
+  }
+
+  .ops-primary-strip > span,
+  .ops-primary-strip > em {
+    grid-column: 1 / -1;
+  }
+
+  .ops-table {
+    margin-inline: -12px;
+    padding-inline: 12px;
+    overscroll-behavior-x: contain;
+  }
+
+  .ops-table .head,
+  .ops-table > button {
+    min-width: 720px;
+  }
+
+  .ops-review-grid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 10px;
+  }
+
+  .ops-review-face {
+    max-width: 140px;
+  }
+
+  .ops-result {
+    width: 100%;
+    max-height: 560px;
+  }
+
+  .moderation-main footer {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .moderation-main footer button {
+    width: 100%;
+  }
+}
+
+@media (max-width: 390px) {
+  .ops-shell {
+    grid-template-columns: 54px minmax(0, 1fr);
+  }
+
+  .ops-main {
+    padding-inline: 8px;
+  }
+
+  .ops-topbar {
+    grid-template-columns: minmax(0, 1fr) 96px;
+  }
+
+  .ops-topbar select {
+    width: 96px;
+  }
+
+  .ops-kpis article {
+    padding: 10px;
+  }
+
+  .ops-kpis strong {
+    font-size: 21px;
+  }
+}
