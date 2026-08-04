@@ -14,6 +14,7 @@ import "./fan-reply.css";
 import "./studio/studio.css";
 import "./studio/studio-v2.css";
 import "./studio/automation-settings.css";
+import "./studio/studio-mobile.css";
 
 export const metadata: Metadata = {
   title: "Atlas AI OS",
